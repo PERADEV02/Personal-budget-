@@ -1,0 +1,195 @@
+
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Personal Budget V0.3</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: #0e1420;
+  color: #f1f5f9;
+  font-family: system-ui, sans-serif;
+  padding: 24px;
+}
+main {
+  max-width: 440px;
+  margin: 40px auto;
+}
+h1 { margin-bottom: 4px; }
+.subtitle { color: #94a3b8; }
+.card {
+  background: #192231;
+  border: 1px solid #334155;
+  border-radius: 20px;
+  padding: 22px;
+  margin-top: 24px;
+}
+input, button {
+  width: 100%;
+  padding: 15px;
+  border-radius: 12px;
+  font-size: 16px;
+  margin-top: 12px;
+}
+input {
+  background: #0e1420;
+  color: white;
+  border: 1px solid #475569;
+}
+button {
+  background: #34d399;
+  color: #052e24;
+  border: none;
+  font-weight: bold;
+  cursor: pointer;
+}
+button.secondary {
+  background: #334155;
+  color: white;
+}
+button:disabled { opacity: 0.5; }
+#message {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin-top: 20px;
+  color: #94a3b8;
+}
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+<h1>Personal Budget</h1>
+<div class="subtitle">V0.3 Alpha · Cloud Authentication</div>
+
+<section class="card" id="auth">
+  <h2>Добре дошли</h2>
+  <input id="name" placeholder="Име" autocomplete="name">
+  <input id="email" type="email" placeholder="Имейл" autocomplete="email">
+  <input id="password" type="password" placeholder="Парола">
+  <button onclick="login()">Вход</button>
+  <button class="secondary" onclick="register()">Регистрация</button>
+</section>
+
+<section class="card" id="account" hidden>
+  <h2>Успешен вход</h2>
+  <p id="userEmail"></p>
+  <p id="profileStatus"></p>
+  <button class="secondary" onclick="logout()">Изход</button>
+</section>
+
+<p id="message" role="status"></p>
+</main>
+
+<script>
+const db = window.supabase.createClient(
+  'https://vhhnmoymvjluxiabuyok.supabase.co',
+  'sb_publishable_Ip21qVAn7RXYM9qEb7JVoA_Ia-4OBVd'
+);
+
+const redirectURL =
+  'https://peradev02.github.io/Personal-budget-/v03.html';
+
+const el = id => document.getElementById(id);
+
+function message(text) {
+  el('message').textContent = text;
+}
+
+async function run(action) {
+  document.querySelectorAll('button').forEach(
+    b => b.disabled = true
+  );
+  try {
+    await action();
+  } catch (error) {
+    message(error.message || 'Възникна грешка.');
+  } finally {
+    document.querySelectorAll('button').forEach(
+      b => b.disabled = false
+    );
+  }
+}
+
+async function register() {
+  await run(async () => {
+    const name = el('name').value.trim();
+    const email = el('email').value.trim();
+    const password = el('password').value;
+
+    if (!name || !email || !password) {
+      message('Попълни име, имейл и парола.');
+      return;
+    }
+
+    const { data, error } = await db.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { full_name: name },
+        emailRedirectTo: redirectURL
+      }
+    });
+
+    if (error) throw error;
+
+    message(data.session
+      ? 'Регистрацията е успешна.'
+      : 'Провери имейла си за потвърждение.');
+  });
+}
+
+async function login() {
+  await run(async () => {
+    const { error } = await db.auth.signInWithPassword({
+      email: el('email').value.trim(),
+      password: el('password').value
+    });
+
+    if (error) throw error;
+    el('password').value = '';
+    message('Входът е успешен.');
+  });
+}
+
+async function logout() {
+  await run(async () => {
+    const { error } = await db.auth.signOut();
+    if (error) throw error;
+    message('Излезе успешно от профила.');
+  });
+}
+
+async function showSession(session) {
+  el('auth').hidden = !!session;
+  el('account').hidden = !session;
+
+  if (!session) return;
+
+  el('userEmail').textContent = session.user.email;
+  el('profileStatus').textContent = 'Проверка на профила...';
+
+  const { data, error } = await db
+    .from('profiles')
+    .select('id, full_name')
+    .eq('id', session.user.id)
+    .maybeSingle();
+
+  el('profileStatus').textContent =
+    error || !data
+      ? 'Профилът в базата не е потвърден.'
+      : 'Профилът е свързан със Supabase: ' + data.full_name;
+}
+
+db.auth.onAuthStateChange((event, session) => {
+  setTimeout(() => {
+    showSession(session).catch(error => message(error.message));
+  }, 0);
+});
+</script>
+</body>
+</html>
