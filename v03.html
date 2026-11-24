@@ -7,188 +7,469 @@
 <title>Personal Budget V0.3</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-* { box-sizing: border-box; }
-body {
-  margin: 0;
-  background: #0e1420;
-  color: #f1f5f9;
-  font-family: system-ui, sans-serif;
-  padding: 24px;
-}
-main {
-  max-width: 440px;
-  margin: 40px auto;
-}
-h1 { margin-bottom: 4px; }
-.subtitle { color: #94a3b8; }
-.card {
-  background: #192231;
-  border: 1px solid #334155;
-  border-radius: 20px;
-  padding: 22px;
-  margin-top: 24px;
-}
-input, button {
-  width: 100%;
-  padding: 15px;
-  border-radius: 12px;
-  font-size: 16px;
-  margin-top: 12px;
-}
-input {
-  background: #0e1420;
-  color: white;
-  border: 1px solid #475569;
-}
-button {
-  background: #34d399;
-  color: #052e24;
-  border: none;
-  font-weight: bold;
-  cursor: pointer;
-}
-button.secondary {
-  background: #334155;
-  color: white;
-}
-button:disabled { opacity: 0.5; }
-#message {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  margin-top: 20px;
-  color: #94a3b8;
-}
-[hidden] { display: none !important; }
+*{box-sizing:border-box}
+body{margin:0;background:#0f172a;color:#f8fafc;font-family:Arial,sans-serif}
+main{max-width:650px;margin:auto;padding:16px}
+h1{font-size:25px}
+h2{font-size:19px}
+.card{background:#1e293b;border-radius:16px;padding:16px;margin:14px 0}
+input,select,button{width:100%;padding:13px;margin:6px 0;border-radius:10px;border:1px solid #475569;font-size:16px}
+input,select{background:#0f172a;color:white}
+button{background:#2563eb;color:white;border:0;font-weight:bold;cursor:pointer}
+.secondary{background:#475569}
+.danger{background:#b91c1c}
+.green{color:#4ade80}
+.red{color:#fb7185}
+.small{font-size:13px;color:#94a3b8}
+.balance{font-size:32px;font-weight:bold}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{background:#0f172a;padding:12px;border-radius:12px}
+.item{padding:12px 0;border-bottom:1px solid #334155}
+.line{display:flex;justify-content:space-between;gap:8px}
+[hidden]{display:none!important}
+#message{white-space:pre-wrap;color:#fbbf24}
 </style>
 </head>
 <body>
 <main>
 <h1>Personal Budget</h1>
-<div class="subtitle">V0.3 Alpha · Cloud Authentication</div>
+<div class="small">V0.3 • Cloud Alpha</div>
+<p id="message"></p>
 
-<section class="card" id="auth">
-  <h2>Добре дошли</h2>
-  <input id="name" placeholder="Име" autocomplete="name">
-  <input id="email" type="email" placeholder="Имейл" autocomplete="email">
-  <input id="password" type="password" placeholder="Парола">
-  <button onclick="login()">Вход</button>
-  <button class="secondary" onclick="register()">Регистрация</button>
+<section id="auth" class="card">
+<h2>Вход в профила</h2>
+<input id="fullName" placeholder="Име при регистрация">
+<input id="email" type="email" placeholder="Имейл">
+<input id="password" type="password" placeholder="Парола">
+<button onclick="login()">Вход</button>
+<button class="secondary" onclick="register()">Регистрация</button>
 </section>
 
-<section class="card" id="account" hidden>
-  <h2>Успешен вход</h2>
-  <p id="userEmail"></p>
-  <p id="profileStatus"></p>
-  <button class="secondary" onclick="logout()">Изход</button>
-</section>
+<section id="app" hidden>
+<div class="card">
+<div id="account"></div>
+<button class="secondary" onclick="logout()">Изход</button>
+</div>
 
-<p id="message" role="status"></p>
+<div class="card">
+<h2>Моите бюджети</h2>
+<select id="budget" onchange="loadTransactions()"></select>
+<button class="secondary" onclick="refresh()">Обнови данните</button>
+<div class="small">Общо приходи минус разходи</div>
+<p class="balance" id="balance">0.00 €</p>
+<div class="stats">
+<div class="stat">Приходи<p class="green" id="income">0.00 €</p></div>
+<div class="stat">Разходи<p class="red" id="expense">0.00 €</p></div>
+</div>
+</div>
+
+<div class="card">
+<h2>Нова операция</h2>
+<select id="type">
+<option value="expense">Разход</option>
+<option value="income">Приход</option>
+</select>
+<input id="txName" placeholder="Наименование">
+<input id="amount" type="number" min="0.01" step="0.01" placeholder="Сума в евро">
+<select id="category">
+<option>Други</option>
+<option>Заплата</option>
+<option>Допълнителен доход</option>
+<option>Храна</option>
+<option>Квартира</option>
+<option>Кредити</option>
+<option>Транспорт</option>
+<option>Автомобил</option>
+<option>Гориво</option>
+<option>Сметки</option>
+<option>Интернет и телефон</option>
+<option>Бебе</option>
+<option>Здраве</option>
+<option>Дрехи</option>
+<option>Развлечения</option>
+<option>Почивки</option>
+<option>Инвестиции</option>
+</select>
+<input id="txDate" type="date">
+<button onclick="addTransaction()">Запази операцията</button>
+</div>
+
+<div class="card">
+<h2>История</h2>
+<div id="transactions"></div>
+</div>
+
+<div class="card">
+<h2>Създай бюджет</h2>
+<input id="budgetName" placeholder="Име на бюджета">
+<select id="budgetType">
+<option value="personal">Личен</option>
+<option value="family">Семеен</option>
+<option value="custom">Друг</option>
+</select>
+<button onclick="createBudget()">Създай</button>
+</div>
+
+<div class="card">
+<h2>Покани член на семейството</h2>
+<p class="small">Избери семеен бюджет от менюто най-горе.</p>
+<input id="inviteEmail" type="email" placeholder="Имейл на потребителя">
+<button onclick="invite()">Изпрати покана в приложението</button>
+<h2>Получени покани</h2>
+<div id="invitations"></div>
+</div>
+
+<div class="card">
+<h2>Кошче</h2>
+<div id="trash"></div>
+</div>
+</section>
 </main>
 
 <script>
 const db = window.supabase.createClient(
-  'https://vhhnmoymvjluxiabuyok.supabase.co',
-  'sb_publishable_Ip21qVAn7RXYM9qEb7JVoA_Ia-4OBVd'
+'https://vhhnmoymvjluxiabuyok.supabase.co',
+'sb_publishable_Ip21qVAn7RXYM9qEb7JVoA_Ia-4OBVd'
 );
 
-const redirectURL =
-  'https://peradev02.github.io/Personal-budget-/v03.html';
-
 const el = id => document.getElementById(id);
+let user = null;
+let budgets = [];
+let records = [];
+let refreshId = 0;
 
-function message(text) {
-  el('message').textContent = text;
+function msg(text){
+el('message').textContent = text || '';
 }
 
-async function run(action) {
-  document.querySelectorAll('button').forEach(
-    b => b.disabled = true
-  );
-  try {
-    await action();
-  } catch (error) {
-    message(error.message || 'Възникна грешка.');
-  } finally {
-    document.querySelectorAll('button').forEach(
-      b => b.disabled = false
-    );
-  }
+function fail(error){
+msg(error.message || String(error));
 }
 
-async function register() {
-  await run(async () => {
-    const name = el('name').value.trim();
-    const email = el('email').value.trim();
-    const password = el('password').value;
-
-    if (!name || !email || !password) {
-      message('Попълни име, имейл и парола.');
-      return;
-    }
-
-    const { data, error } = await db.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: name },
-        emailRedirectTo: redirectURL
-      }
-    });
-
-    if (error) throw error;
-
-    message(data.session
-      ? 'Регистрацията е успешна.'
-      : 'Провери имейла си за потвърждение.');
-  });
+function money(value){
+return Number(value).toFixed(2) + ' €';
 }
 
-async function login() {
-  await run(async () => {
-    const { error } = await db.auth.signInWithPassword({
-      email: el('email').value.trim(),
-      password: el('password').value
-    });
-
-    if (error) throw error;
-    el('password').value = '';
-    message('Входът е успешен.');
-  });
+function today(){
+const d = new Date();
+return d.getFullYear()+'-'+
+String(d.getMonth()+1).padStart(2,'0')+'-'+
+String(d.getDate()).padStart(2,'0');
 }
 
-async function logout() {
-  await run(async () => {
-    const { error } = await db.auth.signOut();
-    if (error) throw error;
-    message('Излезе успешно от профила.');
-  });
+el('txDate').value = today();
+
+async function login(){
+msg('');
+const {error} = await db.auth.signInWithPassword({
+email:el('email').value.trim(),
+password:el('password').value
+});
+if(error) fail(error);
 }
 
-async function showSession(session) {
-  el('auth').hidden = !!session;
-  el('account').hidden = !session;
-
-  if (!session) return;
-
-  el('userEmail').textContent = session.user.email;
-  el('profileStatus').textContent = 'Проверка на профила...';
-
-  const { data, error } = await db
-    .from('profiles')
-    .select('id, full_name')
-    .eq('id', session.user.id)
-    .maybeSingle();
-
-  el('profileStatus').textContent =
-    error || !data
-      ? 'Профилът в базата не е потвърден.'
-      : 'Профилът е свързан със Supabase: ' + data.full_name;
+async function register(){
+const {error} = await db.auth.signUp({
+email:el('email').value.trim(),
+password:el('password').value,
+options:{
+data:{full_name:el('fullName').value.trim()},
+emailRedirectTo:'https://peradev02.github.io/Personal-budget-/v03.html'
+}
+});
+if(error) return fail(error);
+msg('Провери имейла си за потвърждение.');
 }
 
-db.auth.onAuthStateChange((event, session) => {
-  setTimeout(() => {
-    showSession(session).catch(error => message(error.message));
-  }, 0);
+async function logout(){
+const {error} = await db.auth.signOut();
+if(error) fail(error);
+}
+
+async function showSession(session){
+user = session?.user || null;
+el('auth').hidden = !!user;
+el('app').hidden = !user;
+el('password').value = '';
+if(!user){
+refreshId++;
+records=[];
+budgets=[];
+el('transactions').replaceChildren();
+el('trash').replaceChildren();
+el('invitations').replaceChildren();
+el('budget').replaceChildren();
+el('account').textContent='';
+return;
+}
+el('account').textContent=user.email;
+await refresh();
+}
+
+async function refresh(){
+if(!user) return;
+const current = el('budget').value;
+const {data,error} = await db.from('budgets')
+.select('id,name,type,currency')
+.eq('archived',false)
+.order('name');
+
+if(error) return fail(error);
+budgets=data || [];
+el('budget').replaceChildren();
+
+for(const b of budgets){
+const option=document.createElement('option');
+option.value=b.id;
+option.textContent=b.name;
+el('budget').append(option);
+}
+
+if(budgets.some(b=>b.id===current)){
+el('budget').value=current;
+}
+
+await loadTransactions();
+await loadInvitations();
+}
+
+async function createBudget(){
+if(!user) return;
+const name=el('budgetName').value.trim();
+if(!name) return msg('Въведи име на бюджета.');
+
+const {error}=await db.from('budgets').insert({
+owner_id:user.id,
+name:name,
+type:el('budgetType').value,
+currency:'EUR'
+});
+
+if(error) return fail(error);
+el('budgetName').value='';
+msg('Бюджетът е създаден.');
+await refresh();
+}
+
+async function addTransaction(){
+const name=el('txName').value.trim();
+const amount=Number(el('amount').value);
+const budget=el('budget').value;
+
+if(!budget) return msg('Избери бюджет.');
+if(!name || !Number.isFinite(amount) || amount<=0)
+return msg('Въведи име и валидна сума.');
+
+const {error}=await db.rpc('create_transaction',{
+p_name:name,
+p_type:el('type').value,
+p_amount:amount,
+p_budget_ids:[budget],
+p_category:el('category').value,
+p_date:el('txDate').value || today(),
+p_currency:'EUR'
+});
+
+if(error) return fail(error);
+el('txName').value='';
+el('amount').value='';
+msg('Операцията е запазена.');
+await loadTransactions();
+}
+
+async function loadTransactions(){
+const request=++refreshId;
+const budget=el('budget').value;
+records=[];
+
+if(!budget){
+renderTransactions();
+return;
+}
+
+const {data:links,error:linkError}=await db
+.from('transaction_budgets')
+.select('transaction_id')
+.eq('budget_id',budget);
+
+if(request!==refreshId || !user) return;
+if(linkError) return fail(linkError);
+
+const ids=(links || []).map(x=>x.transaction_id);
+
+if(ids.length){
+const {data,error}=await db.from('transactions')
+.select('*')
+.in('id',ids)
+.order('transaction_date',{ascending:false});
+
+if(request!==refreshId || !user) return;
+if(error) return fail(error);
+records=data || [];
+}
+renderTransactions();
+}
+
+function makeButton(label,action,style){
+const b=document.createElement('button');
+b.textContent=label;
+b.className=style || 'secondary';
+b.onclick=action;
+return b;
+}
+
+function renderTransactions(){
+let income=0;
+let expense=0;
+el('transactions').replaceChildren();
+el('trash').replaceChildren();
+
+for(const t of records){
+const row=document.createElement('div');
+row.className='item';
+
+const line=document.createElement('div');
+line.className='line';
+
+const name=document.createElement('strong');
+name.textContent=t.name;
+
+const value=document.createElement('strong');
+value.textContent=money(t.amount);
+value.className=t.type==='income'?'green':'red';
+
+line.append(name,value);
+row.append(line);
+
+const detail=document.createElement('p');
+detail.className='small';
+detail.textContent=t.transaction_date+' • '+(t.category || 'Други');
+row.append(detail);
+
+if(t.deleted_at){
+row.append(makeButton('Възстанови',()=>restore(t.id)));
+el('trash').append(row);
+continue;
+}
+
+if(t.type==='income') income+=Number(t.amount);
+if(t.type==='expense') expense+=Number(t.amount);
+
+row.append(makeButton('Редактирай',()=>edit(t)));
+row.append(makeButton('Изтрий',()=>remove(t.id),'danger'));
+el('transactions').append(row);
+}
+
+el('income').textContent=money(income);
+el('expense').textContent=money(expense);
+el('balance').textContent=money(income-expense);
+
+if(!el('transactions').children.length)
+el('transactions').textContent='Няма операции.';
+
+if(!el('trash').children.length)
+el('trash').textContent='Кошчето е празно.';
+}
+
+async function edit(t){
+const name=prompt('Наименование',t.name);
+if(name===null) return;
+const amount=prompt('Сума',t.amount);
+if(amount===null) return;
+if(!name.trim() || !Number.isFinite(Number(amount)) || Number(amount)<=0)
+return msg('Невалидни данни.');
+
+const {error}=await db.rpc('update_transaction',{
+p_id:t.id,
+p_name:name.trim(),
+p_amount:Number(amount),
+p_date:t.transaction_date,
+p_category:t.category,
+p_subcategory:t.subcategory,
+p_notes:t.notes
+});
+if(error) return fail(error);
+msg('Операцията е редактирана.');
+await loadTransactions();
+}
+
+async function remove(id){
+if(!confirm('Да изтрия ли операцията?')) return;
+const {error}=await db.rpc('delete_transaction',{p_id:id});
+if(error) return fail(error);
+msg('Операцията е преместена в кошчето.');
+await loadTransactions();
+}
+
+async function restore(id){
+const {error}=await db.rpc('restore_transaction',{p_id:id});
+if(error) return fail(error);
+msg('Операцията е възстановена.');
+await loadTransactions();
+}
+
+async function invite(){
+const budget=budgets.find(b=>b.id===el('budget').value);
+if(!budget || budget.type!=='family')
+return msg('Избери семеен бюджет.');
+
+const email=el('inviteEmail').value.trim();
+if(!email) return msg('Въведи имейл.');
+
+const {error}=await db.rpc('create_budget_invitation',{
+p_budget_id:budget.id,
+p_email:email
+});
+
+if(error) return fail(error);
+el('inviteEmail').value='';
+msg('Поканата е създадена в приложението.');
+}
+
+async function loadInvitations(){
+if(!user) return;
+const email=user.email;
+const {data,error}=await db.from('invitations')
+.select('id,email,status,expires_at')
+.eq('status','pending')
+.gt('expires_at',new Date().toISOString());
+
+if(!user || user.email!==email) return;
+if(error) return fail(error);
+el('invitations').replaceChildren();
+
+const received=(data || []).filter(i=>
+i.email.toLowerCase()===email.toLowerCase()
+);
+
+for(const i of received){
+const row=document.createElement('div');
+row.className='item';
+row.textContent='Покана за семеен бюджет';
+row.append(makeButton('Приеми',()=>accept(i.id)));
+el('invitations').append(row);
+}
+
+if(!received.length)
+el('invitations').textContent='Няма нови покани.';
+}
+
+async function accept(id){
+const {error}=await db.rpc('accept_budget_invitation',{
+p_invitation_id:id
+});
+if(error) return fail(error);
+msg('Поканата е приета.');
+await refresh();
+}
+
+db.auth.onAuthStateChange((event,session)=>{
+if(event==='INITIAL_SESSION' ||
+event==='SIGNED_IN' ||
+event==='SIGNED_OUT' ||
+event==='USER_UPDATED'){
+setTimeout(()=>showSession(session),0);
+}
 });
 </script>
 </body>
