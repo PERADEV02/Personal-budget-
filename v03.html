@@ -3,143 +3,498 @@
 <html lang="bg">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Personal Budget V0.3</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
+:root{
+--bg:#0b1220;
+--card:#172235;
+--text:#f8fafc;
+--muted:#94a3b8;
+--border:#334155;
+--blue:#3b82f6;
+--green:#22c55e;
+--red:#f87171;
+}
+body.light{
+--bg:#f1f5f9;
+--card:#ffffff;
+--text:#172033;
+--muted:#64748b;
+--border:#dbe3ed;
+}
 *{box-sizing:border-box}
-body{margin:0;background:#0f172a;color:#f8fafc;font-family:Arial,sans-serif}
-main{max-width:650px;margin:auto;padding:16px}
-h1{font-size:25px}
-h2{font-size:19px}
-.card{background:#1e293b;border-radius:16px;padding:16px;margin:14px 0}
-input,select,button{width:100%;padding:13px;margin:6px 0;border-radius:10px;border:1px solid #475569;font-size:16px}
-input,select{background:#0f172a;color:white}
-button{background:#2563eb;color:white;border:0;font-weight:bold;cursor:pointer}
-.secondary{background:#475569}
+body{
+margin:0;
+background:var(--bg);
+color:var(--text);
+font-family:-apple-system,BlinkMacSystemFont,Arial,sans-serif;
+}
+main{
+max-width:650px;
+margin:auto;
+padding:18px 16px 115px;
+}
+h1{font-size:24px;margin:8px 0}
+h2{font-size:20px}
+h3{font-size:16px}
+p{line-height:1.5}
+small,.muted{color:var(--muted);font-size:13px}
+.card{
+background:var(--card);
+border:1px solid var(--border);
+border-radius:20px;
+padding:16px;
+margin:14px 0;
+}
+input,select,button{
+font:inherit;
+}
+input,select{
+width:100%;
+background:var(--bg);
+color:var(--text);
+border:1px solid var(--border);
+border-radius:12px;
+padding:14px;
+margin:7px 0;
+}
+button{
+border:0;
+border-radius:12px;
+padding:13px;
+background:var(--blue);
+color:white;
+font-weight:600;
+cursor:pointer;
+}
+.full{width:100%;margin:6px 0}
+.secondary{
+background:var(--card);
+color:var(--text);
+border:1px solid var(--border);
+}
 .danger{background:#b91c1c}
-.green{color:#4ade80}
-.red{color:#fb7185}
-.small{font-size:13px;color:#94a3b8}
-.balance{font-size:32px;font-weight:bold}
-.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.stat{background:#0f172a;padding:12px;border-radius:12px}
-.item{padding:12px 0;border-bottom:1px solid #334155}
-.line{display:flex;justify-content:space-between;gap:8px}
+.green{color:var(--green)}
+.red{color:var(--red)}
+.hero{
+background:linear-gradient(135deg,#1e40af,#172554);
+color:white;
+border-radius:22px;
+padding:22px;
+margin:16px 0;
+}
+.balance{
+font-size:34px;
+font-weight:750;
+margin:12px 0 20px;
+}
+.grid{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:12px;
+}
+.hero .grid{
+border-top:1px solid #ffffff33;
+padding-top:16px;
+}
+.quick{
+display:grid;
+grid-template-columns:repeat(3,1fr);
+gap:10px;
+margin:18px 0;
+}
+.quick button{
+background:var(--card);
+color:var(--text);
+border:1px solid var(--border);
+font-size:13px;
+}
+.quick span{
+display:block;
+font-size:26px;
+margin-bottom:8px;
+}
+.nav{
+position:fixed;
+bottom:0;
+left:0;
+right:0;
+display:flex;
+justify-content:center;
+background:var(--card);
+border-top:1px solid var(--border);
+padding:10px 2px calc(10px + env(safe-area-inset-bottom));
+z-index:50;
+}
+.nav button{
+flex:1;
+max-width:130px;
+background:none;
+color:var(--muted);
+font-size:10px;
+padding:5px 0;
+}
+.nav button.active{color:var(--blue)}
+.nav span{
+display:block;
+font-size:24px;
+margin-bottom:5px;
+}
+.row{
+display:flex;
+justify-content:space-between;
+align-items:center;
+gap:10px;
+}
+.item{
+padding:15px 0;
+border-bottom:1px solid var(--border);
+}
+.item:last-child{border-bottom:0}
+.menu{
+display:flex;
+align-items:center;
+justify-content:space-between;
+width:100%;
+padding:17px 0;
+background:none;
+color:var(--text);
+border-bottom:1px solid var(--border);
+border-radius:0;
+text-align:left;
+}
+.actions{
+display:flex;
+gap:8px;
+margin-top:10px;
+}
+.actions button{
+flex:1;
+font-size:12px;
+padding:10px;
+}
+.donut{
+width:180px;
+height:180px;
+border-radius:50%;
+margin:22px auto;
+display:flex;
+align-items:center;
+justify-content:center;
+background:var(--border);
+}
+.donut-center{
+width:120px;
+height:120px;
+border-radius:50%;
+background:var(--card);
+display:flex;
+flex-direction:column;
+align-items:center;
+justify-content:center;
+}
+.legend{
+display:flex;
+align-items:center;
+gap:9px;
+padding:8px 0;
+font-size:14px;
+}
+.dot{
+width:12px;
+height:12px;
+border-radius:50%;
+flex-shrink:0;
+}
+.bar{
+height:12px;
+border-radius:8px;
+background:var(--border);
+overflow:hidden;
+margin:8px 0 18px;
+}
+.bar div{height:100%;border-radius:8px}
+#message{
+position:fixed;
+top:12px;
+left:16px;
+right:16px;
+max-width:600px;
+margin:auto;
+padding:14px;
+border-radius:12px;
+background:#1e40af;
+color:white;
+z-index:100;
+box-shadow:0 4px 20px #0004;
+}
 [hidden]{display:none!important}
-#message{white-space:pre-wrap;color:#fbbf24}
 </style>
 </head>
 <body>
+<div id="message" hidden></div>
 <main>
-<h1>Personal Budget</h1>
-<div class="small">V0.3 • Cloud Alpha</div>
-<p id="message"></p>
 
-<section id="auth" class="card">
-<h2>Вход в профила</h2>
+<section id="auth">
+<h1>Personal Budget</h1>
+<p class="muted">Твоите финанси на едно място</p>
+<div class="card">
+<h2>Добре дошъл</h2>
 <input id="fullName" placeholder="Име при регистрация">
 <input id="email" type="email" placeholder="Имейл">
 <input id="password" type="password" placeholder="Парола">
-<button onclick="login()">Вход</button>
-<button class="secondary" onclick="register()">Регистрация</button>
+<button class="full" onclick="login()">Вход</button>
+<button class="full secondary" onclick="register()">Регистрация</button>
+</div>
 </section>
 
 <section id="app" hidden>
-<div class="card">
-<div id="account"></div>
-<button class="secondary" onclick="logout()">Изход</button>
+<header class="row">
+<div>
+<h1>Personal Budget</h1>
+<small>V0.3 Cloud Alpha</small>
 </div>
+<button class="secondary" onclick="refresh()">↻</button>
+</header>
 
-<div class="card">
-<h2>Моите бюджети</h2>
 <select id="budget" onchange="loadTransactions()"></select>
-<button class="secondary" onclick="refresh()">Обнови данните</button>
-<div class="small">Общо приходи минус разходи</div>
-<p class="balance" id="balance">0.00 €</p>
-<div class="stats">
-<div class="stat">Приходи<p class="green" id="income">0.00 €</p></div>
-<div class="stat">Разходи<p class="red" id="expense">0.00 €</p></div>
+
+<section id="page-home" class="page">
+<div class="hero">
+<small style="color:#cbd5e1">Баланс на избрания бюджет</small>
+<div class="balance" id="balance">0.00 €</div>
+<div class="grid">
+<div>
+<small style="color:#cbd5e1">Приходи</small>
+<h3 id="income" style="color:#86efac">0.00 €</h3>
+</div>
+<div>
+<small style="color:#cbd5e1">Разходи</small>
+<h3 id="expense" style="color:#fda4af">0.00 €</h3>
+</div>
 </div>
 </div>
 
+<div class="quick">
+<button onclick="openForm('income')">
+<span class="green">↙</span>Приход
+</button>
+<button onclick="openForm('expense')">
+<span class="red">↗</span>Разход
+</button>
+<button onclick="showPage('operations')">
+<span>☷</span>История
+</button>
+</div>
+
 <div class="card">
-<h2>Нова операция</h2>
-<select id="type">
+<h3>Разпределение на разходите</h3>
+<div id="homeChart"></div>
+</div>
+
+<div class="card">
+<h3>Последни операции</h3>
+<div id="recent"></div>
+<button class="full secondary" onclick="showPage('operations')">
+Всички операции
+</button>
+</div>
+</section>
+
+<section id="page-operations" class="page" hidden>
+<h2>Операции</h2>
+<div class="grid">
+<button onclick="openForm('income')">+ Приход</button>
+<button onclick="openForm('expense')">+ Разход</button>
+</div>
+
+<div id="transactionForm" class="card" hidden>
+<div class="row">
+<h3>Нова операция</h3>
+<button class="secondary" onclick="closeForm()">✕</button>
+</div>
+<select id="type" onchange="loadCategories()">
 <option value="expense">Разход</option>
 <option value="income">Приход</option>
 </select>
 <input id="txName" placeholder="Наименование">
 <input id="amount" type="number" min="0.01" step="0.01" placeholder="Сума в евро">
-<select id="category">
-<option>Други</option>
-<option>Заплата</option>
-<option>Допълнителен доход</option>
-<option>Храна</option>
-<option>Квартира</option>
-<option>Кредити</option>
-<option>Транспорт</option>
-<option>Автомобил</option>
-<option>Гориво</option>
-<option>Сметки</option>
-<option>Интернет и телефон</option>
-<option>Бебе</option>
-<option>Здраве</option>
-<option>Дрехи</option>
-<option>Развлечения</option>
-<option>Почивки</option>
-<option>Инвестиции</option>
-</select>
+<select id="category"></select>
 <input id="txDate" type="date">
-<button onclick="addTransaction()">Запази операцията</button>
+<button class="full" onclick="addTransaction()">Запази</button>
 </div>
 
 <div class="card">
-<h2>История</h2>
+<h3>История</h3>
+<input id="search" placeholder="Търси операция" oninput="renderTransactions()">
+<select id="filter" onchange="renderTransactions()">
+<option value="all">Всички операции</option>
+<option value="income">Само приходи</option>
+<option value="expense">Само разходи</option>
+</select>
 <div id="transactions"></div>
 </div>
 
+<button class="full secondary" onclick="showPage('trash')">
+Кошче
+</button>
+</section>
+
+<section id="page-budgets" class="page" hidden>
+<h2>Моите бюджети</h2>
+<div id="budgetList"></div>
 <div class="card">
-<h2>Създай бюджет</h2>
+<h3>Създай бюджет</h3>
 <input id="budgetName" placeholder="Име на бюджета">
 <select id="budgetType">
 <option value="personal">Личен</option>
 <option value="family">Семеен</option>
 <option value="custom">Друг</option>
 </select>
-<button onclick="createBudget()">Създай</button>
+<button class="full" onclick="createBudget()">Създай бюджет</button>
 </div>
+</section>
 
+<section id="page-stats" class="page" hidden>
+<h2>Анализи</h2>
 <div class="card">
-<h2>Покани член на семейството</h2>
-<p class="small">Избери семеен бюджет от менюто най-горе.</p>
+<h3>Приходи и разходи</h3>
+<div id="barChart"></div>
+</div>
+<div class="card">
+<h3>Разходи по категории</h3>
+<div id="statsChart"></div>
+</div>
+<p class="muted">Статистиката обхваща всички заредени операции на избрания бюджет.</p>
+</section>
+
+<section id="page-more" class="page" hidden>
+<h2>Още</h2>
+<div class="card">
+<small>Моят профил</small>
+<h3 id="account"></h3>
+</div>
+<div class="card">
+<button class="menu" onclick="showPage('family')">
+Семейство и покани <span>›</span>
+</button>
+<button class="menu" onclick="showPage('trash')">
+Кошче <span>›</span>
+</button>
+<button class="menu" onclick="showPage('settings')">
+Настройки <span>›</span>
+</button>
+<button class="menu" onclick="refresh()">
+Обнови данните <span>↻</span>
+</button>
+</div>
+<div class="card">
+<h3>Предстоящи функции</h3>
+<p class="muted">Портфейли и трансфери</p>
+<p class="muted">Персонални категории</p>
+<p class="muted">Спестовни цели</p>
+<p class="muted">Експорт на данни</p>
+</div>
+<button class="full danger" onclick="logout()">Изход от профила</button>
+</section>
+
+<section id="page-family" class="page" hidden>
+<button class="secondary" onclick="showPage('more')">‹ Назад</button>
+<h2>Семейство и покани</h2>
+<div class="card">
+<h3>Покани член</h3>
+<p class="muted">Избери семейния бюджет от менюто най-горе.</p>
 <input id="inviteEmail" type="email" placeholder="Имейл на потребителя">
-<button onclick="invite()">Изпрати покана в приложението</button>
-<h2>Получени покани</h2>
+<button class="full" onclick="invite()">Създай покана</button>
+</div>
+<div class="card">
+<h3>Получени покани</h3>
 <div id="invitations"></div>
 </div>
+</section>
 
-<div class="card">
+<section id="page-trash" class="page" hidden>
+<button class="secondary" onclick="showPage('operations')">‹ Назад</button>
 <h2>Кошче</h2>
-<div id="trash"></div>
+<p class="muted">Възстановяване до 30 дни след изтриване.</p>
+<div class="card" id="trash"></div>
+</section>
+
+<section id="page-settings" class="page" hidden>
+<button class="secondary" onclick="showPage('more')">‹ Назад</button>
+<h2>Настройки</h2>
+<div class="card">
+<h3>Външен вид</h3>
+<select id="theme" onchange="setTheme(this.value)">
+<option value="dark">Тъмен режим</option>
+<option value="light">Светъл режим</option>
+<option value="system">Според телефона</option>
+</select>
 </div>
+<div class="card">
+<h3>Основна валута</h3>
+<p>EUR — Евро</p>
+</div>
+</section>
 </section>
 </main>
 
+<nav id="nav" class="nav" hidden>
+<button data-page="home" onclick="showPage('home')">
+<span>⌂</span>Начало
+</button>
+<button data-page="operations" onclick="showPage('operations')">
+<span>⇄</span>Операции
+</button>
+<button data-page="budgets" onclick="showPage('budgets')">
+<span>▣</span>Бюджети
+</button>
+<button data-page="stats" onclick="showPage('stats')">
+<span>◔</span>Анализи
+</button>
+<button data-page="more" onclick="showPage('more')">
+<span>☰</span>Още
+</button>
+</nav>
+
 <script>
-const db = window.supabase.createClient(
+const db=window.supabase.createClient(
 'https://vhhnmoymvjluxiabuyok.supabase.co',
 'sb_publishable_Ip21qVAn7RXYM9qEb7JVoA_Ia-4OBVd'
 );
 
-const el = id => document.getElementById(id);
-let user = null;
-let budgets = [];
-let records = [];
-let refreshId = 0;
+const el=id=>document.getElementById(id);
+let user=null;
+let budgets=[];
+let records=[];
+let refreshId=0;
+let sessionId=0;
+let timer;
+let busy=false;
+
+const categories={
+income:[
+'Заплата','Допълнителен доход',
+'Бонус','Подарък','Инвестиции','Други'
+],
+expense:[
+'Храна','Квартира','Кредити','Транспорт',
+'Автомобил','Гориво','Сметки',
+'Интернет и телефон','Бебе','Здраве',
+'Дрехи','Развлечения','Почивки',
+'Инвестиции','Абонаменти','Други'
+]
+};
 
 function msg(text){
-el('message').textContent = text || '';
+clearTimeout(timer);
+el('message').textContent=text;
+el('message').hidden=false;
+timer=setTimeout(()=>{
+el('message').hidden=true;
+},4500);
 }
 
 function fail(error){
@@ -147,29 +502,83 @@ msg(error.message || String(error));
 }
 
 function money(value){
-return Number(value).toFixed(2) + ' €';
+return Number(value).toLocaleString('bg-BG',{
+minimumFractionDigits:2,
+maximumFractionDigits:2
+})+' €';
 }
 
 function today(){
-const d = new Date();
+const d=new Date();
 return d.getFullYear()+'-'+
 String(d.getMonth()+1).padStart(2,'0')+'-'+
 String(d.getDate()).padStart(2,'0');
 }
 
-el('txDate').value = today();
+function setTheme(value){
+localStorage.setItem('pb_theme',value);
+el('theme').value=value;
+document.body.classList.toggle(
+'light',
+value==='light' ||
+(value==='system' &&
+matchMedia('(prefers-color-scheme: light)').matches)
+);
+}
+
+setTheme(localStorage.getItem('pb_theme') || 'dark');
+
+matchMedia('(prefers-color-scheme: light)')
+.addEventListener('change',()=>{
+if(el('theme').value==='system')setTheme('system');
+});
+
+function showPage(page){
+document.querySelectorAll('.page').forEach(p=>{
+p.hidden=p.id!=='page-'+page;
+});
+const mainPage=page==='trash'?'operations':
+['family','settings'].includes(page)?'more':page;
+
+document.querySelectorAll('.nav button').forEach(b=>{
+b.classList.toggle('active',b.dataset.page===mainPage);
+});
+window.scrollTo(0,0);
+if(page==='family')loadInvitations();
+}
+
+function loadCategories(){
+el('category').replaceChildren();
+for(const name of categories[el('type').value]){
+const option=document.createElement('option');
+option.textContent=name;
+option.value=name;
+el('category').append(option);
+}
+}
+
+function openForm(type){
+showPage('operations');
+el('transactionForm').hidden=false;
+el('type').value=type;
+el('txDate').value=today();
+loadCategories();
+}
+
+function closeForm(){
+el('transactionForm').hidden=true;
+}
 
 async function login(){
-msg('');
-const {error} = await db.auth.signInWithPassword({
+const {error}=await db.auth.signInWithPassword({
 email:el('email').value.trim(),
 password:el('password').value
 });
-if(error) fail(error);
+if(error)fail(error);
 }
 
 async function register(){
-const {error} = await db.auth.signUp({
+const {error}=await db.auth.signUp({
 email:el('email').value.trim(),
 password:el('password').value,
 options:{
@@ -177,44 +586,57 @@ data:{full_name:el('fullName').value.trim()},
 emailRedirectTo:'https://peradev02.github.io/Personal-budget-/v03.html'
 }
 });
-if(error) return fail(error);
+if(error)return fail(error);
 msg('Провери имейла си за потвърждение.');
 }
 
 async function logout(){
-const {error} = await db.auth.signOut();
-if(error) fail(error);
+const {error}=await db.auth.signOut();
+if(error)fail(error);
 }
 
 async function showSession(session){
-user = session?.user || null;
-el('auth').hidden = !!user;
-el('app').hidden = !user;
-el('password').value = '';
-if(!user){
+sessionId++;
 refreshId++;
+user=session?.user || null;
 records=[];
 budgets=[];
-el('transactions').replaceChildren();
-el('trash').replaceChildren();
-el('invitations').replaceChildren();
+
+el('auth').hidden=!!user;
+el('app').hidden=!user;
+el('nav').hidden=!user;
+el('password').value='';
 el('budget').replaceChildren();
+el('budgetList').replaceChildren();
+el('invitations').replaceChildren();
+el('txName').value='';
+el('amount').value='';
+el('inviteEmail').value='';
+el('budgetName').value='';
 el('account').textContent='';
-return;
-}
+renderTransactions();
+closeForm();
+
+if(!user)return;
+
 el('account').textContent=user.email;
+showPage('home');
 await refresh();
 }
 
 async function refresh(){
-if(!user) return;
-const current = el('budget').value;
-const {data,error} = await db.from('budgets')
-.select('id,name,type,currency')
+if(!user)return;
+const sid=sessionId;
+const current=el('budget').value;
+
+const {data,error}=await db.from('budgets')
+.select('id,name,type,currency,owner_id')
 .eq('archived',false)
 .order('name');
 
-if(error) return fail(error);
+if(sid!==sessionId)return;
+if(error)return fail(error);
+
 budgets=data || [];
 el('budget').replaceChildren();
 
@@ -229,85 +651,9 @@ if(budgets.some(b=>b.id===current)){
 el('budget').value=current;
 }
 
+renderBudgets();
 await loadTransactions();
 await loadInvitations();
-}
-
-async function createBudget(){
-if(!user) return;
-const name=el('budgetName').value.trim();
-if(!name) return msg('Въведи име на бюджета.');
-
-const {error}=await db.from('budgets').insert({
-owner_id:user.id,
-name:name,
-type:el('budgetType').value,
-currency:'EUR'
-});
-
-if(error) return fail(error);
-el('budgetName').value='';
-msg('Бюджетът е създаден.');
-await refresh();
-}
-
-async function addTransaction(){
-const name=el('txName').value.trim();
-const amount=Number(el('amount').value);
-const budget=el('budget').value;
-
-if(!budget) return msg('Избери бюджет.');
-if(!name || !Number.isFinite(amount) || amount<=0)
-return msg('Въведи име и валидна сума.');
-
-const {error}=await db.rpc('create_transaction',{
-p_name:name,
-p_type:el('type').value,
-p_amount:amount,
-p_budget_ids:[budget],
-p_category:el('category').value,
-p_date:el('txDate').value || today(),
-p_currency:'EUR'
-});
-
-if(error) return fail(error);
-el('txName').value='';
-el('amount').value='';
-msg('Операцията е запазена.');
-await loadTransactions();
-}
-
-async function loadTransactions(){
-const request=++refreshId;
-const budget=el('budget').value;
-records=[];
-
-if(!budget){
-renderTransactions();
-return;
-}
-
-const {data:links,error:linkError}=await db
-.from('transaction_budgets')
-.select('transaction_id')
-.eq('budget_id',budget);
-
-if(request!==refreshId || !user) return;
-if(linkError) return fail(linkError);
-
-const ids=(links || []).map(x=>x.transaction_id);
-
-if(ids.length){
-const {data,error}=await db.from('transactions')
-.select('*')
-.in('id',ids)
-.order('transaction_date',{ascending:false});
-
-if(request!==refreshId || !user) return;
-if(error) return fail(error);
-records=data || [];
-}
-renderTransactions();
 }
 
 function makeButton(label,action,style){
@@ -318,67 +664,330 @@ b.onclick=action;
 return b;
 }
 
-function renderTransactions(){
-let income=0;
-let expense=0;
-el('transactions').replaceChildren();
-el('trash').replaceChildren();
+function renderBudgets(){
+el('budgetList').replaceChildren();
 
-for(const t of records){
+for(const b of budgets){
+const card=document.createElement('div');
+card.className='card';
+
+const title=document.createElement('h3');
+title.textContent=b.name;
+
+const detail=document.createElement('p');
+detail.className='muted';
+detail.textContent=(
+b.type==='family'?'Семеен':
+b.type==='personal'?'Личен':'Друг'
+)+' • '+b.currency;
+
+card.append(title,detail);
+card.append(makeButton('Отвори бюджет',()=>{
+el('budget').value=b.id;
+loadTransactions();
+showPage('home');
+},'full'));
+
+el('budgetList').append(card);
+}
+}
+
+async function createBudget(){
+if(!user || busy)return;
+const name=el('budgetName').value.trim();
+if(!name)return msg('Въведи име.');
+
+busy=true;
+try{
+const {error}=await db.from('budgets').insert({
+owner_id:user.id,
+name,
+type:el('budgetType').value,
+currency:'EUR'
+});
+if(error)return fail(error);
+el('budgetName').value='';
+msg('Бюджетът е създаден.');
+await refresh();
+}finally{busy=false;}
+}
+
+async function addTransaction(){
+if(!user || busy)return;
+const name=el('txName').value.trim();
+const amount=Number(el('amount').value);
+const budget=el('budget').value;
+
+if(!budget)return msg('Първо създай или избери бюджет.');
+if(!name || !Number.isFinite(amount) || amount<=0)
+return msg('Въведи име и валидна сума.');
+
+busy=true;
+try{
+const {error}=await db.rpc('create_transaction',{
+p_name:name,
+p_type:el('type').value,
+p_amount:amount,
+p_budget_ids:[budget],
+p_category:el('category').value,
+p_date:el('txDate').value || today(),
+p_currency:'EUR'
+});
+if(error)return fail(error);
+
+el('txName').value='';
+el('amount').value='';
+closeForm();
+msg('Операцията е запазена.');
+await loadTransactions();
+}finally{busy=false;}
+}
+
+async function loadTransactions(){
+const request=++refreshId;
+const budget=el('budget').value;
+records=[];
+renderTransactions();
+
+if(!user || !budget)return;
+
+const collected=[];
+let offset=0;
+
+while(true){
+const {data:links,error}=await db
+.from('transaction_budgets')
+.select('transaction_id')
+.eq('budget_id',budget)
+.order('transaction_id')
+.range(offset,offset+199);
+
+if(request!==refreshId || !user)return;
+if(error)return fail(error);
+if(!links || !links.length)break;
+
+const ids=links.map(x=>x.transaction_id);
+const {data,error:txError}=await db
+.from('transactions')
+.select('*')
+.in('id',ids);
+
+if(request!==refreshId || !user)return;
+if(txError)return fail(txError);
+
+collected.push(...(data || []));
+if(links.length<200)break;
+offset+=200;
+}
+
+records=collected.sort((a,b)=>
+b.transaction_date.localeCompare(a.transaction_date) ||
+b.created_at.localeCompare(a.created_at)
+);
+renderTransactions();
+}
+
+function renderItem(t,compact=false){
 const row=document.createElement('div');
 row.className='item';
 
 const line=document.createElement('div');
-line.className='line';
+line.className='row';
 
 const name=document.createElement('strong');
 name.textContent=t.name;
 
 const value=document.createElement('strong');
-value.textContent=money(t.amount);
 value.className=t.type==='income'?'green':'red';
+value.textContent=(t.type==='income'?'+':'−')+money(t.amount);
 
 line.append(name,value);
 row.append(line);
 
 const detail=document.createElement('p');
-detail.className='small';
+detail.className='muted';
 detail.textContent=t.transaction_date+' • '+(t.category || 'Други');
 row.append(detail);
 
+if(compact)return row;
+
+const actions=document.createElement('div');
+actions.className='actions';
+
 if(t.deleted_at){
-row.append(makeButton('Възстанови',()=>restore(t.id)));
-el('trash').append(row);
-continue;
+actions.append(makeButton('Възстанови',()=>restore(t.id)));
+}else{
+actions.append(
+makeButton('Редактирай',()=>edit(t)),
+makeButton('Изтрий',()=>remove(t.id),'danger')
+);
+}
+row.append(actions);
+return row;
 }
 
-if(t.type==='income') income+=Number(t.amount);
-if(t.type==='expense') expense+=Number(t.amount);
+function renderTransactions(){
+const active=records.filter(t=>!t.deleted_at);
+let income=0;
+let expense=0;
+const totals={};
 
-row.append(makeButton('Редактирай',()=>edit(t)));
-row.append(makeButton('Изтрий',()=>remove(t.id),'danger'));
-el('transactions').append(row);
+for(const t of active){
+const amount=Number(t.amount);
+if(t.type==='income')income+=amount;
+if(t.type==='expense'){
+expense+=amount;
+const category=t.category || 'Други';
+totals[category]=(totals[category] || 0)+amount;
+}
 }
 
+el('balance').textContent=money(income-expense);
 el('income').textContent=money(income);
 el('expense').textContent=money(expense);
-el('balance').textContent=money(income-expense);
+
+el('recent').replaceChildren();
+el('transactions').replaceChildren();
+el('trash').replaceChildren();
+
+for(const t of active.slice(0,5)){
+el('recent').append(renderItem(t,true));
+}
+
+const search=el('search').value.toLowerCase();
+const filter=el('filter').value;
+
+for(const t of active){
+if(filter!=='all' && t.type!==filter)continue;
+if(!((t.name+' '+(t.category || '')).toLowerCase().includes(search)))continue;
+el('transactions').append(renderItem(t));
+}
+
+for(const t of records.filter(t=>t.deleted_at)){
+el('trash').append(renderItem(t));
+}
+
+if(!el('recent').children.length)
+el('recent').textContent='Няма операции.';
 
 if(!el('transactions').children.length)
 el('transactions').textContent='Няма операции.';
 
 if(!el('trash').children.length)
 el('trash').textContent='Кошчето е празно.';
+
+drawDonut('homeChart',totals,expense);
+drawDonut('statsChart',totals,expense);
+drawBars(income,expense);
+}
+
+function drawDonut(id,totals,total){
+const container=el(id);
+container.replaceChildren();
+
+if(total<=0){
+container.textContent='Все още няма разходи.';
+return;
+}
+
+const colors=[
+'#3b82f6','#22c55e','#f59e0b',
+'#a855f7','#ef4444','#06b6d4',
+'#ec4899','#64748b'
+];
+
+const entries=Object.entries(totals)
+.sort((a,b)=>b[1]-a[1]);
+
+let start=0;
+const parts=[];
+
+entries.forEach(([name,value],i)=>{
+const end=start+value/total*100;
+parts.push(colors[i%colors.length]+' '+start+'% '+end+'%');
+start=end;
+});
+
+const donut=document.createElement('div');
+donut.className='donut';
+donut.style.background='conic-gradient('+parts.join(',')+')';
+
+const center=document.createElement('div');
+center.className='donut-center';
+
+const label=document.createElement('small');
+label.textContent='Разходи';
+const sum=document.createElement('strong');
+sum.textContent=money(total);
+
+center.append(label,sum);
+donut.append(center);
+container.append(donut);
+
+entries.forEach(([name,value],i)=>{
+const line=document.createElement('div');
+line.className='legend';
+
+const dot=document.createElement('span');
+dot.className='dot';
+dot.style.background=colors[i%colors.length];
+
+const title=document.createElement('span');
+title.textContent=name;
+title.style.flex='1';
+
+const amount=document.createElement('strong');
+amount.textContent=money(value)+' · '+Math.round(value/total*100)+'%';
+
+line.append(dot,title,amount);
+container.append(line);
+});
+}
+
+function drawBars(income,expense){
+const container=el('barChart');
+container.replaceChildren();
+const max=Math.max(income,expense,1);
+
+for(const [name,value,color] of [
+['Приходи',income,'#22c55e'],
+['Разходи',expense,'#ef4444']
+]){
+const title=document.createElement('div');
+title.className='row';
+
+const label=document.createElement('span');
+label.textContent=name;
+
+const sum=document.createElement('strong');
+sum.textContent=money(value);
+
+title.append(label,sum);
+
+const bar=document.createElement('div');
+bar.className='bar';
+
+const fill=document.createElement('div');
+fill.style.width=(value/max*100)+'%';
+fill.style.background=color;
+
+bar.append(fill);
+container.append(title,bar);
+}
 }
 
 async function edit(t){
+if(busy)return;
 const name=prompt('Наименование',t.name);
-if(name===null) return;
+if(name===null)return;
 const amount=prompt('Сума',t.amount);
-if(amount===null) return;
+if(amount===null)return;
+
 if(!name.trim() || !Number.isFinite(Number(amount)) || Number(amount)<=0)
 return msg('Невалидни данни.');
 
+busy=true;
+try{
 const {error}=await db.rpc('update_transaction',{
 p_id:t.id,
 p_name:name.trim(),
@@ -388,54 +997,68 @@ p_category:t.category,
 p_subcategory:t.subcategory,
 p_notes:t.notes
 });
-if(error) return fail(error);
+if(error)return fail(error);
 msg('Операцията е редактирана.');
 await loadTransactions();
+}finally{busy=false;}
 }
 
 async function remove(id){
-if(!confirm('Да изтрия ли операцията?')) return;
+if(busy || !confirm('Да изтрия ли операцията?'))return;
+busy=true;
+try{
 const {error}=await db.rpc('delete_transaction',{p_id:id});
-if(error) return fail(error);
+if(error)return fail(error);
 msg('Операцията е преместена в кошчето.');
 await loadTransactions();
+}finally{busy=false;}
 }
 
 async function restore(id){
+if(busy)return;
+busy=true;
+try{
 const {error}=await db.rpc('restore_transaction',{p_id:id});
-if(error) return fail(error);
+if(error)return fail(error);
 msg('Операцията е възстановена.');
 await loadTransactions();
+}finally{busy=false;}
 }
 
 async function invite(){
+if(!user || busy)return;
 const budget=budgets.find(b=>b.id===el('budget').value);
 if(!budget || budget.type!=='family')
 return msg('Избери семеен бюджет.');
 
 const email=el('inviteEmail').value.trim();
-if(!email) return msg('Въведи имейл.');
+if(!email)return msg('Въведи имейл.');
 
+busy=true;
+try{
 const {error}=await db.rpc('create_budget_invitation',{
 p_budget_id:budget.id,
 p_email:email
 });
-
-if(error) return fail(error);
+if(error)return fail(error);
 el('inviteEmail').value='';
 msg('Поканата е създадена в приложението.');
+}finally{busy=false;}
 }
 
 async function loadInvitations(){
-if(!user) return;
+if(!user)return;
+const sid=sessionId;
 const email=user.email;
+
 const {data,error}=await db.from('invitations')
 .select('id,email,status,expires_at')
 .eq('status','pending')
 .gt('expires_at',new Date().toISOString());
 
-if(!user || user.email!==email) return;
-if(error) return fail(error);
+if(sid!==sessionId)return;
+if(error)return fail(error);
+
 el('invitations').replaceChildren();
 
 const received=(data || []).filter(i=>
@@ -445,8 +1068,11 @@ i.email.toLowerCase()===email.toLowerCase()
 for(const i of received){
 const row=document.createElement('div');
 row.className='item';
-row.textContent='Покана за семеен бюджет';
-row.append(makeButton('Приеми',()=>accept(i.id)));
+
+const title=document.createElement('p');
+title.textContent='Покана за семеен бюджет';
+
+row.append(title,makeButton('Приеми',()=>accept(i.id),'full'));
 el('invitations').append(row);
 }
 
@@ -455,22 +1081,33 @@ el('invitations').textContent='Няма нови покани.';
 }
 
 async function accept(id){
+if(busy)return;
+busy=true;
+try{
 const {error}=await db.rpc('accept_budget_invitation',{
 p_invitation_id:id
 });
-if(error) return fail(error);
+if(error)return fail(error);
 msg('Поканата е приета.');
 await refresh();
+}finally{busy=false;}
 }
 
 db.auth.onAuthStateChange((event,session)=>{
-if(event==='INITIAL_SESSION' ||
-event==='SIGNED_IN' ||
-event==='SIGNED_OUT' ||
-event==='USER_UPDATED'){
-setTimeout(()=>showSession(session),0);
+if(['INITIAL_SESSION','SIGNED_IN','SIGNED_OUT','USER_UPDATED'].includes(event)){
+setTimeout(()=>{
+if(event==='SIGNED_IN' && user?.id===session?.user?.id)return;
+showSession(session);
+},0);
 }
 });
+
+document.addEventListener('visibilitychange',()=>{
+if(!document.hidden && user && !busy)refresh();
+});
+
+loadCategories();
+el('txDate').value=today();
 </script>
 </body>
 </html>
