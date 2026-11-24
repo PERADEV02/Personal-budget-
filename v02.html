@@ -1,0 +1,683 @@
+
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Personal Budget V0.2</title>
+<style>
+:root{
+--bg:#0b1220;--card:#182334;--text:#f1f5f9;
+--muted:#94a3b8;--green:#34d399;
+--red:#fb7185;--border:#334155;
+}
+body.light{
+--bg:#f1f5f9;--card:#fff;--text:#172033;
+--muted:#64748b;--border:#cbd5e1;
+--green:#059669;--red:#dc2626;
+}
+*{box-sizing:border-box}
+body{
+margin:0;background:var(--bg);color:var(--text);
+font-family:-apple-system,BlinkMacSystemFont,Arial,sans-serif;
+padding-bottom:100px;
+}
+header{
+display:flex;align-items:center;justify-content:space-between;
+padding:20px;max-width:800px;margin:auto;
+}
+h1{font-size:23px;margin:0}
+h2{font-size:20px;margin:0 0 15px}
+h3{font-size:16px;margin:0 0 10px}
+main{max-width:800px;margin:auto;padding:0 16px}
+.card{
+background:var(--card);border:1px solid var(--border);
+border-radius:18px;padding:17px;margin-bottom:14px;
+}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.muted,small{color:var(--muted)}
+.green{color:var(--green)}
+.red{color:var(--red)}
+.big{font-size:30px;font-weight:700;margin:10px 0}
+button,input,select{font:inherit;min-width:0}
+button{
+border:0;border-radius:12px;padding:12px;
+background:var(--card);color:var(--text);cursor:pointer;
+}
+.primary{background:var(--green);color:#052e24;font-weight:700}
+.outline{border:1px solid var(--border)}
+.danger{color:var(--red)}
+.full{width:100%}
+input,select{
+display:block;width:100%;max-width:100%;
+background:var(--bg);color:var(--text);
+border:1px solid var(--border);border-radius:10px;
+padding:12px;margin:6px 0 14px;min-height:46px;
+}
+label{font-size:13px;color:var(--muted)}
+nav{
+position:fixed;bottom:0;left:0;right:0;
+background:var(--card);border-top:1px solid var(--border);
+display:flex;justify-content:space-around;
+padding:10px 2px calc(10px + env(safe-area-inset-bottom));
+z-index:10;
+}
+nav button{font-size:11px;padding:5px;flex:1}
+nav span{display:block;font-size:23px;margin-bottom:5px}
+nav .active{color:var(--green)}
+.item{padding:13px 0;border-bottom:1px solid var(--border)}
+.item:last-child{border-bottom:0}
+.actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.actions button{font-size:12px;padding:8px;border:1px solid var(--border)}
+.bar{height:9px;background:var(--border);border-radius:10px;overflow:hidden;margin:8px 0}
+.bar div{height:100%;background:var(--green)}
+.empty{text-align:center;color:var(--muted);padding:25px 5px}
+.status{color:var(--green);font-size:14px;text-align:center;margin-top:12px}
+button:disabled{opacity:.45}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header>
+<div>
+<h1>Personal Budget</h1>
+<small>V0.2 Alpha</small>
+</div>
+<button class="outline" onclick="toggleTheme()">☀ / ☾</button>
+</header>
+
+<main id="app"></main>
+
+<nav id="nav"></nav>
+
+<script>
+const KEY='personalBudget_v02_alpha';
+const $=id=>document.getElementById(id);
+const uid=()=>crypto.randomUUID();
+const today=()=>{
+const d=new Date();
+return new Date(d.getTime()-d.getTimezoneOffset()*60000)
+.toISOString().slice(0,10);
+};
+const esc=v=>String(v??'').replace(/[&<>"']/g,
+c=>({'&':'&amp;','<':'&lt;','>':'&gt;',
+'"':'&quot;',"'":'&#39;'}[c]));
+const money=n=>Number(n||0).toLocaleString('bg-BG',{
+minimumFractionDigits:2,maximumFractionDigits:2
+})+' €';
+
+let db={
+budgets:[{id:'personal',name:'Личен бюджет',
+type:'personal',archived:false}],
+members:[{id:'owner',name:'Аз',role:'admin'}],
+wallets:[],transactions:[],trash:[],
+categories:{
+income:['Заплата','Бонус','Допълнителен доход','Други'],
+expense:['Храна','Жилище','Кредит','Автомобил',
+'Транспорт','Бебе','Здраве','Сметки','Пазаруване',
+'Почивка','Абонаменти','Развлечения','Други']
+},
+theme:'dark',hide:false,view:'detail',actor:'owner'
+};
+
+try{
+const saved=JSON.parse(localStorage.getItem(KEY));
+if(saved)db={...db,...saved};
+}catch(e){}
+
+let page='home';
+let month=today().slice(0,7);
+let selectedBudget='all';
+let editId=null;
+
+function save(){
+try{
+localStorage.setItem(KEY,JSON.stringify(db));
+return true;
+}catch(e){
+alert('Данните не могат да бъдат записани.');
+return false;
+}
+}
+
+function toggleTheme(){
+db.theme=db.theme==='dark'?'light':'dark';
+save();render();
+}
+
+function go(p){
+page=p;editId=null;render();window.scrollTo(0,0);
+}
+
+function memberName(id){
+return db.members.find(x=>x.id===id)?.name||'Неизвестен';
+}
+
+function walletName(id){
+return db.wallets.find(x=>x.id===id)?.name||'Без портфейл';
+}
+
+function budgetName(id){
+return db.budgets.find(x=>x.id===id)?.name||'Архив';
+}
+
+function isAdmin(){
+return db.members.find(x=>x.id===db.actor)?.role==='admin';
+}
+
+function canEdit(t){
+return isAdmin()||t.author===db.actor;
+}
+
+function visible(t){
+return t.budgets.some(id=>{
+const b=db.budgets.find(x=>x.id===id);
+return b&&(b.type!=='personal'||isAdmin()||t.person===db.actor);
+});
+}
+
+function totals(list){
+const income=list.filter(t=>t.type==='income')
+.reduce((s,t)=>s+t.amount,0);
+const expense=list.filter(t=>t.type==='expense')
+.reduce((s,t)=>s+t.amount,0);
+return {income,expense,balance:income-expense};
+}
+
+function monthly(){
+return db.transactions.filter(t=>
+t.date.startsWith(month)&&visible(t));
+}
+
+function walletBalance(id){
+let w=db.wallets.find(x=>x.id===id);
+let sum=w?.opening||0;
+db.transactions.forEach(t=>{
+if(t.wallet===id){
+if(t.type==='income')sum+=t.amount;
+else sum-=t.amount;
+}
+if(t.type==='transfer'&&t.destination===id)sum+=t.amount;
+});
+return sum;
+}
+
+function monthPicker(){
+return `<label>Месец</label>
+<input type="month" value="${month}"
+onchange="month=this.value;render()">`;
+}
+
+function summary(list){
+let t=totals(list);
+return `<div class="card">
+<small>Месечен остатък</small>
+<div class="big ${t.balance>=0?'green':'red'}">
+${db.hide?'••••••':money(t.balance)}</div>
+<div class="grid">
+<div><small>Приходи</small>
+<h3 class="green">${db.hide?'••••':money(t.income)}</h3></div>
+<div><small>Разходи</small>
+<h3 class="red">${db.hide?'••••':money(t.expense)}</h3></div>
+</div></div>`;
+}
+
+function home(){
+let available=db.wallets.reduce((s,w)=>s+walletBalance(w.id),0);
+return `${monthPicker()}
+<div class="card">
+<div class="row"><small>Наличност в портфейлите</small>
+<button onclick="db.hide=!db.hide;save();render()">◉</button></div>
+<div class="big">${db.hide?'••••••':money(available)}</div>
+</div>
+${summary(monthly())}
+<h3>Бързи действия</h3>
+<div class="grid" style="margin-bottom:18px">
+<button class="primary" onclick="quick('income')">+ Приход</button>
+<button class="outline" onclick="quick('expense')">− Разход</button>
+<button class="outline" onclick="quick('transfer')">⇄ Трансфер</button>
+<button class="outline" onclick="alert('Сканирането предстои във V0.5')">▣ Сканиране</button>
+</div>
+<h3>Моите бюджети</h3>
+${db.budgets.filter(b=>!b.archived).map(b=>{
+let t=totals(monthly().filter(x=>x.budgets.includes(b.id)));
+return `<div class="card" onclick="openBudget('${b.id}')">
+<div class="row"><strong>${esc(b.name)}</strong><span>›</span></div>
+<div class="big ${t.balance>=0?'green':'red'}">
+${db.hide?'••••':money(t.balance)}</div>
+<small>Месечен остатък</small></div>`;
+}).join('')}
+<button class="primary full" onclick="go('newbudget')">+ Създай нов бюджет</button>
+<br><br><h3>Моите портфейли</h3>
+${db.wallets.map(w=>`<div class="card row">
+<span>${esc(w.name)}</span>
+<strong>${db.hide?'••••':money(walletBalance(w.id))}</strong>
+</div>`).join('')||'<div class="empty">Няма създадени портфейли</div>'}
+<button class="outline full" onclick="go('wallets')">Управление на портфейли</button>`;
+}
+
+function budgets(){
+return `<h2>Моите бюджети</h2>
+<button class="primary full" onclick="go('newbudget')">+ Създай бюджет</button>
+<br><br>
+${db.budgets.map(b=>`<div class="card">
+<div class="row"><strong>${esc(b.name)}</strong>
+<small>${b.archived?'Архивиран':b.type==='family'?'Семеен':b.type==='personal'?'Личен':'Персонализиран'}</small></div>
+<div class="actions">
+<button onclick="openBudget('${b.id}')">Отвори</button>
+${isAdmin()?`<button onclick="renameBudget('${b.id}')">Редактирай</button>
+<button onclick="archiveBudget('${b.id}')">${b.archived?'Възстанови':'Архивирай'}</button>
+<button class="danger" onclick="deleteBudget('${b.id}')">Изтрий</button>`:''}
+</div></div>`).join('')}`;
+}
+
+function newBudget(){
+return `<h2>Нов бюджет</h2>
+<form class="card" onsubmit="createBudget(event)">
+<label>Наименование</label>
+<input id="bn" required placeholder="Например: Семеен бюджет">
+<label>Вид бюджет</label>
+<select id="bt">
+<option value="personal">Личен</option>
+<option value="family">Семеен</option>
+<option value="custom">Персонализиран</option>
+</select>
+<button class="primary full">Създай бюджет</button>
+</form>`;
+}
+
+function createBudget(e){
+e.preventDefault();
+if(!isAdmin())return alert('Необходими са администраторски права.');
+db.budgets.push({id:uid(),name:$('bn').value.trim(),
+type:$('bt').value,archived:false});
+save();go('budgets');
+}
+
+function renameBudget(id){
+if(!isAdmin())return;
+let b=db.budgets.find(x=>x.id===id);
+let n=prompt('Ново име',b.name);
+if(n?.trim()){b.name=n.trim();save();render();}
+}
+
+function archiveBudget(id){
+if(!isAdmin())return;
+let b=db.budgets.find(x=>x.id===id);
+b.archived=!b.archived;save();render();
+}
+
+function deleteBudget(id){
+if(!isAdmin())return;
+if(db.transactions.some(t=>t.budgets.includes(id)))
+return alert('Бюджетът съдържа транзакции. Архивирай го вместо това.');
+if(confirm('Да изтрием бюджета?')){
+db.budgets=db.budgets.filter(b=>b.id!==id);
+save();render();
+}
+}
+
+function openBudget(id){
+selectedBudget=id;go('budget');
+}
+
+function budgetDetail(){
+let b=db.budgets.find(x=>x.id===selectedBudget);
+if(!b)return budgets();
+let list=monthly().filter(t=>t.budgets.includes(b.id));
+return `<h2>${esc(b.name)}</h2>
+${monthPicker()}${summary(list)}
+${b.type==='family'?`<h3>Членове на семейството</h3>
+${db.members.map(m=>{
+let t=totals(list.filter(x=>x.person===m.id));
+return `<div class="card"><strong>${esc(m.name)}</strong>
+<p class="green">Приходи: ${money(t.income)}</p>
+<p class="red">Разходи: ${money(t.expense)}</p>
+Остатък: ${money(t.balance)}</div>`;
+}).join('')}
+<button class="outline full" onclick="go('members')">Управление на членовете</button><br><br>`:''}
+<h3>Транзакции</h3>
+${transactionList(list)}`;
+}
+
+function quick(type){
+go('add');$('tt').value=type;updateForm();
+}
+
+function add(){
+let t=db.transactions.find(x=>x.id===editId);
+return `<h2>${t?'Редактиране':'Нова транзакция'}</h2>
+<form class="card" id="tf" onsubmit="submitTransaction(event)">
+<label>Вид</label>
+<select id="tt" onchange="updateForm()">
+<option value="expense">Разход</option>
+<option value="income">Приход</option>
+<option value="transfer">Трансфер</option>
+</select>
+<label>Наименование</label>
+<input id="tn" required placeholder="Например: Храна" value="${esc(t?.name||'')}">
+<label>Сума в евро</label>
+<input id="ta" type="number" min="0.01" step="0.01" required value="${t?.amount||''}">
+<label>Дата</label>
+<input id="td" type="date" required value="${t?.date||today()}">
+<div id="categoryArea">
+<label>Категория</label>
+<select id="tc"></select>
+<label>Подкатегория (по избор)</label>
+<input id="ts" value="${esc(t?.subcategory||'')}">
+</div>
+<label>Портфейл</label>
+<select id="tw"><option value="">Без портфейл</option>
+${db.wallets.map(w=>`<option value="${w.id}">${esc(w.name)}</option>`).join('')}
+</select>
+<div id="destinationArea" hidden>
+<label>Към портфейл</label>
+<select id="destination">
+${db.wallets.map(w=>`<option value="${w.id}">${esc(w.name)}</option>`).join('')}
+</select></div>
+<label>Извършил транзакцията</label>
+<select id="tp">${db.members.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join('')}</select>
+<label>Въвежда: ${esc(memberName(db.actor))}</label>
+<br><br>
+<label>Към кои бюджети?</label>
+<div id="budgetChecks">
+${db.budgets.filter(b=>!b.archived||t?.budgets.includes(b.id)).map((b,i)=>
+`<label class="row" style="padding:9px 0;color:var(--text)">
+${esc(b.name)}
+<input style="width:20px;min-height:20px;margin:0" type="checkbox"
+name="budget" value="${b.id}" ${(t?t.budgets.includes(b.id):i===0)?'checked':''}>
+</label>`).join('')}
+</div>
+<br>
+<div class="grid">
+<button id="confirmBtn" class="primary" type="submit">✓ Въведи</button>
+<button class="outline" type="button" onclick="go('add')">+ Нова транзакция</button>
+</div>
+<div id="status" class="status"></div>
+</form>`;
+}
+
+function updateForm(){
+let type=$('tt').value;
+$('categoryArea').hidden=type==='transfer';
+$('destinationArea').hidden=type!=='transfer';
+$('tc').innerHTML=(db.categories[type]||['Трансфер'])
+.map(c=>`<option>${esc(c)}</option>`).join('');
+}
+
+function setupForm(){
+let t=db.transactions.find(x=>x.id===editId);
+$('tt').value=t?.type||'expense';
+updateForm();
+$('tp').value=t?.person||db.actor;
+$('tw').value=t?.wallet||'';
+if(t){
+$('tc').value=t.category;
+if(t.destination)$('destination').value=t.destination;
+}
+}
+
+function submitTransaction(e){
+e.preventDefault();
+if($('confirmBtn').disabled)return;
+let type=$('tt').value;
+let amount=Math.round(Number($('ta').value)*100)/100;
+let wallet=$('tw').value;
+let destination=type==='transfer'?$('destination').value:'';
+let ids=[...document.querySelectorAll('[name=budget]:checked')]
+.map(x=>x.value);
+if(!Number.isFinite(amount)||amount<=0||!$('tn').value.trim())
+return alert('Въведи валидни данни.');
+if(!ids.length)return alert('Избери бюджет.');
+if(type==='transfer'&&(!wallet||!destination||wallet===destination))
+return alert('Избери два различни портфейла.');
+let old=db.transactions.find(t=>t.id===editId);
+if(old&&!canEdit(old))return alert('Нямаш права.');
+let available=walletBalance(wallet);
+if(old?.wallet===wallet)
+available+=old.type==='income'?-old.amount:old.amount;
+if(old?.destination===wallet)available-=old.amount;
+if(wallet&&type!=='income'&&amount>available&&
+!confirm('Портфейлът ще има отрицателен баланс. Продължаваш ли?'))return;
+
+let t={
+id:old?.id||uid(),name:$('tn').value.trim(),
+type,amount,date:$('td').value,
+category:type==='transfer'?'Трансфер':$('tc').value,
+subcategory:$('ts').value.trim(),
+wallet,destination,budgets:ids,person:$('tp').value,
+author:old?.author||db.actor,
+created:old?.created||new Date().toISOString(),
+history:[...(old?.history||[]),{
+action:old?'edit':'create',by:db.actor,
+at:new Date().toISOString()
+}]
+};
+let previous=db.transactions;
+db.transactions=old?db.transactions.map(x=>x.id===old.id?t:x)
+:[...db.transactions,t];
+if(!save()){db.transactions=previous;return;}
+$('tf').querySelectorAll('input,select').forEach(x=>x.disabled=true);
+$('confirmBtn').disabled=true;
+$('status').textContent='✓ Транзакцията е запазена успешно';
+}
+
+function transactionList(list){
+if(!list.length)return '<div class="empty">Няма транзакции</div>';
+return list.map(t=>`<div class="card">
+<div class="row"><strong>${esc(t.name)}</strong>
+<strong class="${t.type==='income'?'green':t.type==='expense'?'red':''}">
+${t.type==='income'?'+':t.type==='expense'?'−':'⇄'}${money(t.amount)}</strong></div>
+<small>${esc(t.date)} · ${esc(t.category)}</small>
+${db.view==='detail'?`<p>Извършил: <strong>${esc(memberName(t.person))}</strong><br>
+Въвел: <strong>${esc(memberName(t.author))}</strong><br>
+Портфейл: ${esc(walletName(t.wallet))}<br>
+Бюджет: ${t.budgets.map(id=>esc(budgetName(id))).join(', ')}</p>`:''}
+${canEdit(t)?`<div class="actions">
+<button onclick="editTransaction('${t.id}')">Редактирай</button>
+<button class="danger" onclick="removeTransaction('${t.id}')">Изтрий</button>
+</div>`:''}
+</div>`).join('');
+}
+
+function editTransaction(id){
+let t=db.transactions.find(x=>x.id===id);
+if(!t||!canEdit(t))return;
+page='add';editId=id;render();window.scrollTo(0,0);
+}
+
+function removeTransaction(id){
+let t=db.transactions.find(x=>x.id===id);
+if(!t||!canEdit(t)||!confirm('Преместване в кошчето?'))return;
+db.trash.push({...t,deletedAt:Date.now(),deletedBy:db.actor});
+db.transactions=db.transactions.filter(x=>x.id!==id);
+save();render();
+}
+
+function transactions(){
+return `<h2>Транзакции</h2>${monthPicker()}
+<input id="search" placeholder="Търси транзакция..." oninput="filterList()">
+<select id="sort" onchange="filterList()">
+<option value="date">Най-нови</option>
+<option value="amount">Най-голяма сума</option>
+<option value="category">По категория</option>
+<option value="person">По член</option>
+</select>
+<button class="outline full" onclick="db.view=db.view==='detail'?'compact':'detail';save();filterList()">
+Смени изгледа</button><br><br>
+<div id="list"></div>`;
+}
+
+function filterList(){
+let q=$('search').value.toLowerCase();
+let list=monthly().filter(t=>[
+t.name,t.category,t.subcategory,t.date,t.amount,memberName(t.person)
+].join(' ').toLowerCase().includes(q));
+let s=$('sort').value;
+list.sort((a,b)=>s==='amount'?b.amount-a.amount:
+s==='category'?a.category.localeCompare(b.category):
+s==='person'?memberName(a.person).localeCompare(memberName(b.person)):
+b.date.localeCompare(a.date));
+$('list').innerHTML=transactionList(list);
+}
+
+function wallets(){
+return `<h2>Портфейли</h2>
+${db.wallets.map(w=>`<div class="card">
+<strong>${esc(w.name)}</strong><br>
+<small>${esc(w.type)}</small>
+<div class="big ${walletBalance(w.id)<0?'red':'green'}">${money(walletBalance(w.id))}</div>
+</div>`).join('')}
+<form class="card" onsubmit="createWallet(event)">
+<h3>Нов портфейл</h3>
+<label>Име</label><input id="wn" required placeholder="Revolut">
+<label>Вид</label><select id="wt">
+<option>Банкова сметка</option><option>Пари в брой</option>
+<option>Спестявания</option><option>Инвестиции</option>
+<option>Други</option></select>
+<label>Начална наличност (€)</label>
+<input id="wo" type="number" step="0.01" value="0" required>
+<button class="primary full">+ Създай портфейл</button>
+</form>`;
+}
+
+function createWallet(e){
+e.preventDefault();
+db.wallets.push({id:uid(),name:$('wn').value.trim(),
+type:$('wt').value,opening:Number($('wo').value)});
+save();render();
+}
+
+function members(){
+return `<h2>Семейни профили</h2>
+<div class="card">
+<small>Локална симулация на профили</small>
+<label>Активен профил</label>
+<select onchange="db.actor=this.value;save();render()">
+${db.members.map(m=>`<option value="${m.id}" ${m.id===db.actor?'selected':''}>${esc(m.name)}</option>`).join('')}
+</select></div>
+${db.members.map(m=>`<div class="card row">
+<strong>${esc(m.name)}</strong>
+<small>${m.role==='admin'?'Администратор':'Член'}</small>
+</div>`).join('')}
+${isAdmin()?`<form class="card" onsubmit="createMember(event)">
+<label>Име на нов член</label><input id="mn" required>
+<button class="primary full">+ Добави член</button></form>`:''}`;
+}
+
+function createMember(e){
+e.preventDefault();if(!isAdmin())return;
+db.members.push({id:uid(),name:$('mn').value.trim(),role:'member'});
+save();render();
+}
+
+function analysis(){
+let list=monthly(),t=totals(list),cats={};
+list.filter(x=>x.type==='expense').forEach(x=>{
+cats[x.category]=(cats[x.category]||0)+x.amount;
+});
+let colors=['#34d399','#60a5fa','#fbbf24','#c084fc','#fb7185','#38bdf8'];
+let pos=0;
+let entries=Object.entries(cats).sort((a,b)=>b[1]-a[1]);
+let gradient=entries.map(([c,n],i)=>{
+let start=pos;pos+=n/t.expense*100;
+return `${colors[i%colors.length]} ${start}% ${pos}%`;
+}).join(',');
+return `<h2>Анализи</h2>${monthPicker()}${summary(list)}
+<div class="card"><h3>Разпределение на разходите</h3>
+${t.expense?`<div style="width:190px;height:190px;border-radius:50%;margin:20px auto;background:conic-gradient(${gradient});display:grid;place-items:center">
+<div style="width:125px;height:125px;background:var(--card);border-radius:50%;display:grid;place-items:center;font-weight:bold">${money(t.expense)}</div></div>`:''}
+${entries.map(([c,n],i)=>`<div class="item">
+<div class="row"><span>${esc(c)}</span><strong>${money(n)}</strong></div>
+<div class="bar"><div style="width:${n/t.expense*100}%;background:${colors[i%colors.length]}"></div></div>
+<small>${(n/t.expense*100).toFixed(1)}%</small>
+</div>`).join('')||'<div class="empty">Няма разходи</div>'}
+</div>`;
+}
+
+function trash(){
+db.trash=db.trash.filter(t=>Date.now()-t.deletedAt<30*86400000);
+save();
+return `<h2>Кошче — 30 дни</h2>
+${db.trash.filter(canEdit).map(t=>`<div class="card">
+<div class="row"><strong>${esc(t.name)}</strong>${money(t.amount)}</div>
+<div class="actions"><button onclick="restore('${t.id}')">Възстанови</button></div>
+</div>`).join('')||'<div class="empty">Кошчето е празно</div>'}`;
+}
+
+function restore(id){
+let t=db.trash.find(x=>x.id===id);
+if(!t||!canEdit(t))return;
+if(t.budgets.some(id=>!db.budgets.some(b=>b.id===id)))
+return alert('Липсва оригиналният бюджет.');
+db.transactions.push(t);
+db.trash=db.trash.filter(x=>x.id!==id);
+save();render();
+}
+
+function categories(){
+return `<h2>Категории</h2>
+<div class="card">
+${Object.entries(db.categories).map(([k,v])=>
+`<h3>${k==='income'?'Приходи':'Разходи'}</h3>
+<p>${v.map(esc).join(' · ')}</p>`).join('')}
+<form onsubmit="addCategory(event)">
+<select id="ct"><option value="expense">Разход</option>
+<option value="income">Приход</option></select>
+<input id="cn" required placeholder="Нова категория">
+<button class="primary full">Добави</button>
+</form></div>`;
+}
+
+function addCategory(e){
+e.preventDefault();
+let n=$('cn').value.trim(),k=$('ct').value;
+if(n&&!db.categories[k].includes(n))db.categories[k].push(n);
+save();render();
+}
+
+function menu(){
+return `<h2>Меню</h2>
+${[['wallets','💳 Портфейли'],['members','👥 Семейни профили'],
+['transactions','↔ Транзакции'],['categories','▤ Категории'],
+['trash','♲ Кошче'],['backup','▣ Резервно копие']]
+.map(([p,n])=>`<button class="card full" style="text-align:left" onclick="go('${p}')">${n}　›</button>`).join('')}
+<div class="card"><h3>Предстоящи функционалности</h3>
+<p class="muted">Месечни планове, лимити, спестовни цели, банкови връзки, известия и AI анализ.</p>
+<small>Данните в тази версия са локални.</small></div>`;
+}
+
+function backup(){
+return `<h2>Резервно копие</h2>
+<div class="card">
+<p>Запази копие на локалните си данни. Файлът съдържа финансова информация.</p>
+<button class="primary full" onclick="downloadBackup()">Изтегли резервно копие</button>
+</div>`;
+}
+
+function downloadBackup(){
+let url=URL.createObjectURL(new Blob([JSON.stringify(db,null,2)],{type:'application/json'}));
+let a=document.createElement('a');
+a.href=url;a.download='personal-budget-backup.json';a.click();
+setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
+function render(){
+document.body.classList.toggle('light',db.theme==='light');
+let pages={home,budgets,newbudget:newBudget,budget:budgetDetail,
+add,transactions,wallets,members,analysis,trash,categories,menu,backup};
+$('app').innerHTML=(pages[page]||home)();
+$('nav').innerHTML=[
+['home','⌂','Начало'],['budgets','▣','Бюджети'],
+['add','＋','Добави'],['analysis','◉','Анализи'],
+['menu','☰','Меню']
+].map(([p,i,n])=>`<button class="${page===p?'active':''}" onclick="go('${p}')">
+<span>${i}</span>${n}</button>`).join('');
+if(page==='add')setupForm();
+if(page==='transactions')filterList();
+}
+render();
+</script>
+</body>
+</html>
