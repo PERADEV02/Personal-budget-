@@ -1,0 +1,436 @@
+
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Personal Budget</title>
+<style>
+:root {
+  --bg:#101722;
+  --card:#1c2838;
+  --text:#f1f5f9;
+  --muted:#a0aec0;
+  --accent:#34d399;
+  --border:#334155;
+}
+body.light {
+  --bg:#f1f5f9;
+  --card:#ffffff;
+  --text:#172033;
+  --muted:#64748b;
+  --border:#dbe2ea;
+}
+* {box-sizing:border-box}
+body {
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+}
+main {
+  max-width:650px;
+  margin:auto;
+  padding:20px 16px 40px;
+}
+header {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+h1 {font-size:25px}
+h2 {font-size:18px}
+.card {
+  background:var(--card);
+  border-radius:18px;
+  padding:18px;
+  margin:14px 0;
+}
+small {color:var(--muted)}
+.balance {
+  font-size:36px;
+  font-weight:750;
+  margin:12px 0 22px;
+}
+.grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+}
+.income {color:#34d399}
+.expense {color:#f87171}
+input,select,button {
+  font:inherit;
+  border-radius:10px;
+  padding:12px;
+}
+input,select {
+  width:100%;
+  background:var(--bg);
+  color:var(--text);
+  border:1px solid var(--border);
+  margin:5px 0 12px;
+  font-size:16px;
+}
+button {
+  border:0;
+  background:var(--accent);
+  color:#09251c;
+  font-weight:650;
+  cursor:pointer;
+}
+.primary {width:100%}
+.secondary {
+  background:var(--card);
+  color:var(--text);
+}
+label {
+  font-size:13px;
+  color:var(--muted);
+}
+.transaction {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  justify-content:space-between;
+  padding:14px 0;
+  border-bottom:1px solid var(--border);
+}
+.transaction div:first-child {
+  flex:1;
+  overflow-wrap:anywhere;
+}
+.delete {
+  background:transparent;
+  color:#f87171;
+  padding:8px;
+}
+#chart {
+  width:160px;
+  height:160px;
+  border-radius:50%;
+  margin:20px auto;
+  display:grid;
+  place-items:center;
+}
+#chartCenter {
+  width:112px;
+  height:112px;
+  background:var(--card);
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  font-weight:bold;
+}
+.legend {
+  display:flex;
+  justify-content:space-between;
+  margin:10px 0;
+}
+.dot {
+  display:inline-block;
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  margin-right:8px;
+}
+footer {
+  text-align:center;
+  color:var(--muted);
+  font-size:12px;
+  padding:15px;
+}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>Personal Budget</h1>
+  <button class="secondary" id="theme">☀ / ☾</button>
+</header>
+
+<label for="month">Бюджетен период</label>
+<input type="month" id="month">
+
+<section class="card">
+  <small>Месечен остатък</small>
+  <div class="balance" id="balance">0,00 €</div>
+  <div class="grid">
+    <div>
+      <small>Приходи</small>
+      <h2 class="income" id="income">0,00 €</h2>
+    </div>
+    <div>
+      <small>Разходи</small>
+      <h2 class="expense" id="expense">0,00 €</h2>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Нова транзакция</h2>
+  <form id="form">
+    <label for="type">Вид</label>
+    <select id="type">
+      <option value="expense">Разход</option>
+      <option value="income">Приход</option>
+    </select>
+
+    <label for="description">Наименование</label>
+    <input id="description" placeholder="Например Kaufland" maxlength="120" required>
+
+    <label for="amount">Сума в евро</label>
+    <input id="amount" type="number" min="0.01" max="100000000" step="0.01" placeholder="0.00" required>
+
+    <label for="category">Категория</label>
+    <select id="category"></select>
+
+    <label for="date">Дата</label>
+    <input type="date" id="date" required>
+
+    <button class="primary" type="submit">+ Добави транзакция</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Разпределение на разходите</h2>
+  <div id="chart">
+    <div id="chartCenter">0 €</div>
+  </div>
+  <div id="legend"></div>
+</section>
+
+<section class="card">
+  <h2>Транзакции</h2>
+  <div id="transactions"></div>
+</section>
+
+<footer>Personal Budget · V0.1 Alpha</footer>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const storageKey = 'personalBudgetTransactions';
+const categories = {
+  expense: [
+    'Храна и магазини',
+    'Жилище',
+    'Кредити',
+    'Ток и вода',
+    'Интернет и телефон',
+    'Транспорт',
+    'Автомобил',
+    'Бебе и деца',
+    'Здраве',
+    'Дрехи',
+    'Забавления',
+    'Ресторанти',
+    'Абонаменти',
+    'Дом и обзавеждане',
+    'Пътувания',
+    'Други'
+  ],
+  income: [
+    'Заплата',
+    'Допълнителен доход',
+    'Бонус',
+    'Подарък',
+    'Други приходи'
+  ]
+};
+const colors = [
+  '#34d399','#60a5fa','#f59e0b',
+  '#a78bfa','#f87171','#22d3ee',
+  '#f472b6','#84cc16','#fb923c',
+  '#818cf8','#14b8a6','#94a3b8'
+];
+
+let transactions = [];
+try {
+  transactions = JSON.parse(
+    localStorage.getItem(storageKey) || '[]'
+  );
+  if (!Array.isArray(transactions)) transactions = [];
+} catch {
+  transactions = [];
+}
+
+function today() {
+  const d = new Date();
+  return [
+    d.getFullYear(),
+    String(d.getMonth()+1).padStart(2,'0'),
+    String(d.getDate()).padStart(2,'0')
+  ].join('-');
+}
+
+function money(cents) {
+  return new Intl.NumberFormat('bg-BG',{
+    style:'currency',
+    currency:'EUR'
+  }).format(cents/100);
+}
+
+function save(next) {
+  try {
+    localStorage.setItem(storageKey,JSON.stringify(next));
+    transactions = next;
+    return true;
+  } catch {
+    alert('Данните не могат да бъдат запазени.');
+    return false;
+  }
+}
+
+function updateCategories() {
+  $('category').replaceChildren();
+  categories[$('type').value].forEach(name => {
+    const option = document.createElement('option');
+    option.value = name;
+    option.textContent = name;
+    $('category').append(option);
+  });
+}
+
+function render() {
+  const selected = transactions.filter(
+    t => t.date.slice(0,7) === $('month').value
+  );
+  let income = 0;
+  let expense = 0;
+  const groups = {};
+
+  selected.forEach(t => {
+    if (t.type === 'income') {
+      income += t.amount;
+    } else {
+      expense += t.amount;
+      groups[t.category] = (groups[t.category] || 0) + t.amount;
+    }
+  });
+
+  $('income').textContent = money(income);
+  $('expense').textContent = money(expense);
+  $('balance').textContent = money(income-expense);
+  $('chartCenter').textContent = money(expense);
+  $('legend').replaceChildren();
+
+  let start = 0;
+  const segments = [];
+
+  Object.entries(groups)
+    .sort((a,b)=>b[1]-a[1])
+    .forEach(([name,value],i)=>{
+      const color = colors[i % colors.length];
+      const end = start + value/expense*100;
+      segments.push(`${color} ${start}% ${end}%`);
+      start = end;
+
+      const row = document.createElement('div');
+      row.className = 'legend';
+      const title = document.createElement('span');
+      const dot = document.createElement('span');
+      dot.className = 'dot';
+      dot.style.background = color;
+      title.append(dot,document.createTextNode(name));
+      const amount = document.createElement('strong');
+      amount.textContent = money(value);
+      row.append(title,amount);
+      $('legend').append(row);
+    });
+
+  $('chart').style.background = expense
+    ? `conic-gradient(${segments.join(',')})`
+    : 'var(--border)';
+
+  $('transactions').replaceChildren();
+
+  if (!selected.length) {
+    $('transactions').textContent = 'Все още няма транзакции.';
+  }
+
+  selected.sort((a,b)=>b.date.localeCompare(a.date))
+    .forEach(t=>{
+      const row = document.createElement('div');
+      row.className = 'transaction';
+
+      const details = document.createElement('div');
+      const title = document.createElement('strong');
+      title.textContent = t.description;
+      const info = document.createElement('small');
+      info.textContent = t.category + ' · ' + t.date;
+      details.append(title,document.createElement('br'),info);
+
+      const amount = document.createElement('strong');
+      amount.className = t.type;
+      amount.textContent =
+        (t.type==='income'?'+':'−') + money(t.amount);
+
+      const del = document.createElement('button');
+      del.className = 'delete';
+      del.textContent = '✕';
+      del.setAttribute('aria-label','Изтрий транзакцията');
+      del.onclick = ()=>{
+        if (confirm('Да изтрия ли транзакцията?')) {
+          if(save(transactions.filter(x=>x.id!==t.id))) render();
+        }
+      };
+
+      row.append(details,amount,del);
+      $('transactions').append(row);
+    });
+}
+
+$('form').addEventListener('submit',e=>{
+  e.preventDefault();
+  const amount = Math.round(Number($('amount').value)*100);
+  const description = $('description').value.trim();
+
+  if (!description || !Number.isSafeInteger(amount) || amount<=0) {
+    alert('Въведи валидно име и сума.');
+    return;
+  }
+
+  const transaction = {
+    id:crypto.randomUUID(),
+    type:$('type').value,
+    description,
+    amount,
+    category:$('category').value,
+    date:$('date').value
+  };
+
+  if(save([...transactions,transaction])) {
+    $('month').value = transaction.date.slice(0,7);
+    $('description').value = '';
+    $('amount').value = '';
+    render();
+  }
+});
+
+$('type').onchange = updateCategories;
+$('month').onchange = render;
+$('theme').onclick = ()=>{
+  document.body.classList.toggle('light');
+  try {
+    localStorage.setItem(
+      'budgetTheme',
+      document.body.classList.contains('light')?'light':'dark'
+    );
+  } catch {}
+};
+
+try {
+  if(localStorage.getItem('budgetTheme')==='light') {
+    document.body.classList.add('light');
+  }
+} catch {}
+
+$('date').value = today();
+$('month').value = today().slice(0,7);
+updateCategories();
+render();
+</script>
+</body>
+</html>
