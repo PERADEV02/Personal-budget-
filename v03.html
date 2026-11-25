@@ -48,9 +48,7 @@ border-radius:20px;
 padding:16px;
 margin:14px 0;
 }
-input,select,button{
-font:inherit;
-}
+input,select,button{font:inherit}
 input,select{
 width:100%;
 background:var(--bg);
@@ -216,6 +214,16 @@ overflow:hidden;
 margin:8px 0 18px;
 }
 .bar div{height:100%;border-radius:8px}
+.wallet-icon{
+font-size:26px;
+background:var(--bg);
+padding:12px;
+border-radius:14px;
+}
+.wallet-value{
+font-size:20px;
+font-weight:700;
+}
 #message{
 position:fixed;
 top:12px;
@@ -284,9 +292,19 @@ box-shadow:0 4px 20px #0004;
 <button onclick="openForm('expense')">
 <span class="red">↗</span>Разход
 </button>
-<button onclick="showPage('operations')">
-<span>☷</span>История
+<button onclick="openForm('transfer')">
+<span>⇄</span>Трансфер
 </button>
+</div>
+
+<div class="card">
+<div class="row">
+<div>
+<small>Лични портфейли</small>
+<h2 id="homeWalletTotal">0.00 €</h2>
+</div>
+<button class="secondary" onclick="showPage('wallets')">Отвори ›</button>
+</div>
 </div>
 
 <div class="card">
@@ -309,19 +327,39 @@ box-shadow:0 4px 20px #0004;
 <button onclick="openForm('income')">+ Приход</button>
 <button onclick="openForm('expense')">+ Разход</button>
 </div>
+<button class="full secondary" onclick="openForm('transfer')">
+⇄ Нов трансфер
+</button>
 
 <div id="transactionForm" class="card" hidden>
 <div class="row">
 <h3>Нова операция</h3>
 <button class="secondary" onclick="closeForm()">✕</button>
 </div>
-<select id="type" onchange="loadCategories()">
+
+<select id="type" onchange="updateForm()">
 <option value="expense">Разход</option>
 <option value="income">Приход</option>
+<option value="transfer">Трансфер</option>
 </select>
+
 <input id="txName" placeholder="Наименование">
 <input id="amount" type="number" min="0.01" step="0.01" placeholder="Сума в евро">
+
+<div id="categoryField">
+<small>Категория</small>
 <select id="category"></select>
+</div>
+
+<small id="walletLabel">Портфейл (незадължително)</small>
+<select id="txWallet"></select>
+
+<div id="destinationField" hidden>
+<small>Към портфейл</small>
+<select id="destinationWallet"></select>
+<p class="muted">Трансферът не се отчита като приход или разход.</p>
+</div>
+
 <input id="txDate" type="date">
 <button class="full" onclick="addTransaction()">Запази</button>
 </div>
@@ -333,6 +371,7 @@ box-shadow:0 4px 20px #0004;
 <option value="all">Всички операции</option>
 <option value="income">Само приходи</option>
 <option value="expense">Само разходи</option>
+<option value="transfer">Само трансфери</option>
 </select>
 <div id="transactions"></div>
 </div>
@@ -367,7 +406,7 @@ box-shadow:0 4px 20px #0004;
 <h3>Разходи по категории</h3>
 <div id="statsChart"></div>
 </div>
-<p class="muted">Статистиката обхваща всички заредени операции на избрания бюджет.</p>
+<p class="muted">Статистиката обхваща всички операции на избрания бюджет.</p>
 </section>
 
 <section id="page-more" class="page" hidden>
@@ -377,6 +416,9 @@ box-shadow:0 4px 20px #0004;
 <h3 id="account"></h3>
 </div>
 <div class="card">
+<button class="menu" onclick="showPage('wallets')">
+Портфейли <span>›</span>
+</button>
 <button class="menu" onclick="showPage('family')">
 Семейство и покани <span>›</span>
 </button>
@@ -392,12 +434,54 @@ box-shadow:0 4px 20px #0004;
 </div>
 <div class="card">
 <h3>Предстоящи функции</h3>
-<p class="muted">Портфейли и трансфери</p>
 <p class="muted">Персонални категории</p>
 <p class="muted">Спестовни цели</p>
 <p class="muted">Експорт на данни</p>
 </div>
 <button class="full danger" onclick="logout()">Изход от профила</button>
+</section>
+
+<section id="page-wallets" class="page" hidden>
+<button class="secondary" onclick="showPage('more')">‹ Назад</button>
+<h2>Моите портфейли</h2>
+
+<div class="hero">
+<small style="color:#cbd5e1">Обща наличност в активните портфейли</small>
+<div class="balance" id="walletTotal">0.00 €</div>
+</div>
+
+<div class="grid">
+<button onclick="toggleWalletForm()">+ Портфейл</button>
+<button class="secondary" onclick="openForm('transfer')">⇄ Трансфер</button>
+</div>
+
+<div class="card" id="walletForm" hidden>
+<h3>Нов портфейл</h3>
+<input id="walletName" placeholder="Наименование">
+<select id="walletType">
+<option value="bank">Банкова сметка</option>
+<option value="cash">Пари в брой</option>
+<option value="savings">Спестявания</option>
+<option value="investment">Инвестиции</option>
+<option value="custom">Друг</option>
+</select>
+<small>Начално салдо в евро</small>
+<input id="openingBalance" type="number" step="0.01" value="0">
+<p class="muted">Началното салдо не се отчита като приход.</p>
+<button class="full" onclick="createWallet()">Създай портфейл</button>
+</div>
+
+<div id="walletList"></div>
+
+<button class="full secondary" onclick="showPage('archivedWallets')">
+Архивирани портфейли
+</button>
+</section>
+
+<section id="page-archivedWallets" class="page" hidden>
+<button class="secondary" onclick="showPage('wallets')">‹ Назад</button>
+<h2>Архивирани портфейли</h2>
+<div id="archivedWalletList"></div>
 </section>
 
 <section id="page-family" class="page" hidden>
@@ -438,6 +522,7 @@ box-shadow:0 4px 20px #0004;
 <p>EUR — Евро</p>
 </div>
 </section>
+
 </section>
 </main>
 
@@ -469,7 +554,9 @@ const el=id=>document.getElementById(id);
 let user=null;
 let budgets=[];
 let records=[];
+let wallets=[];
 let refreshId=0;
+let walletRequest=0;
 let sessionId=0;
 let timer;
 let busy=false;
@@ -486,6 +573,22 @@ expense:[
 'Дрехи','Развлечения','Почивки',
 'Инвестиции','Абонаменти','Други'
 ]
+};
+
+const walletTypes={
+bank:'Банкова сметка',
+cash:'Пари в брой',
+savings:'Спестявания',
+investment:'Инвестиции',
+custom:'Друг'
+};
+
+const walletIcons={
+bank:'🏦',
+cash:'💵',
+savings:'🐷',
+investment:'📈',
+custom:'👛'
 };
 
 function msg(text){
@@ -537,19 +640,31 @@ function showPage(page){
 document.querySelectorAll('.page').forEach(p=>{
 p.hidden=p.id!=='page-'+page;
 });
+
 const mainPage=page==='trash'?'operations':
-['family','settings'].includes(page)?'more':page;
+['family','settings','wallets','archivedWallets'].includes(page)?'more':page;
 
 document.querySelectorAll('.nav button').forEach(b=>{
 b.classList.toggle('active',b.dataset.page===mainPage);
 });
+
 window.scrollTo(0,0);
+
 if(page==='family')loadInvitations();
+if(page==='wallets' || page==='archivedWallets')loadWallets();
+}
+
+function makeButton(label,action,style){
+const b=document.createElement('button');
+b.textContent=label;
+b.className=style || 'secondary';
+b.onclick=action;
+return b;
 }
 
 function loadCategories(){
 el('category').replaceChildren();
-for(const name of categories[el('type').value]){
+for(const name of categories[el('type').value] || []){
 const option=document.createElement('option');
 option.textContent=name;
 option.value=name;
@@ -557,16 +672,35 @@ el('category').append(option);
 }
 }
 
+function updateForm(){
+const transfer=el('type').value==='transfer';
+
+el('categoryField').hidden=transfer;
+el('destinationField').hidden=!transfer;
+
+el('walletLabel').textContent=transfer?
+'От портфейл':'Портфейл (незадължително)';
+
+loadCategories();
+fillWalletSelects();
+}
+
 function openForm(type){
 showPage('operations');
 el('transactionForm').hidden=false;
 el('type').value=type;
 el('txDate').value=today();
-loadCategories();
+el('txName').value=type==='transfer'?'Трансфер':'';
+el('amount').value='';
+updateForm();
 }
 
 function closeForm(){
 el('transactionForm').hidden=true;
+}
+
+function toggleWalletForm(){
+el('walletForm').hidden=!el('walletForm').hidden;
 }
 
 async function login(){
@@ -598,9 +732,11 @@ if(error)fail(error);
 async function showSession(session){
 sessionId++;
 refreshId++;
+walletRequest++;
 user=session?.user || null;
 records=[];
 budgets=[];
+wallets=[];
 
 el('auth').hidden=!!user;
 el('app').hidden=!user;
@@ -613,7 +749,12 @@ el('txName').value='';
 el('amount').value='';
 el('inviteEmail').value='';
 el('budgetName').value='';
+el('walletName').value='';
+el('openingBalance').value='0';
+el('walletForm').hidden=true;
 el('account').textContent='';
+
+renderWallets();
 renderTransactions();
 closeForm();
 
@@ -652,16 +793,10 @@ el('budget').value=current;
 }
 
 renderBudgets();
+await loadWallets();
+if(sid!==sessionId)return;
 await loadTransactions();
 await loadInvitations();
-}
-
-function makeButton(label,action,style){
-const b=document.createElement('button');
-b.textContent=label;
-b.className=style || 'secondary';
-b.onclick=action;
-return b;
 }
 
 function renderBudgets(){
@@ -682,6 +817,7 @@ b.type==='personal'?'Личен':'Друг'
 )+' • '+b.currency;
 
 card.append(title,detail);
+
 card.append(makeButton('Отвори бюджет',()=>{
 el('budget').value=b.id;
 loadTransactions();
@@ -694,6 +830,7 @@ el('budgetList').append(card);
 
 async function createBudget(){
 if(!user || busy)return;
+
 const name=el('budgetName').value.trim();
 if(!name)return msg('Въведи име.');
 
@@ -706,39 +843,293 @@ type:el('budgetType').value,
 currency:'EUR'
 });
 if(error)return fail(error);
+
 el('budgetName').value='';
 msg('Бюджетът е създаден.');
 await refresh();
 }finally{busy=false;}
 }
 
+async function loadWallets(){
+if(!user)return;
+const sid=sessionId;
+const request=++walletRequest;
+
+const {data,error}=await db.rpc('get_wallet_balances');
+
+if(sid!==sessionId || request!==walletRequest)return;
+if(error)return fail(error);
+
+wallets=data || [];
+renderWallets();
+}
+
+function fillWalletSelects(){
+const active=wallets.filter(w=>!w.archived && w.currency==='EUR');
+const transfer=el('type').value==='transfer';
+
+for(const id of ['txWallet','destinationWallet']){
+const select=el(id);
+const old=select.value;
+select.replaceChildren();
+
+const empty=document.createElement('option');
+empty.value='';
+empty.textContent=transfer?
+'Избери портфейл':'Без портфейл';
+select.append(empty);
+
+for(const w of active){
+const option=document.createElement('option');
+option.value=w.wallet_id;
+option.textContent=w.name+' — '+money(w.current_balance);
+select.append(option);
+}
+
+if(active.some(w=>w.wallet_id===old)){
+select.value=old;
+}
+}
+}
+
+function renderWallets(){
+const active=wallets.filter(w=>!w.archived);
+const archived=wallets.filter(w=>w.archived);
+
+const total=active
+.filter(w=>w.currency==='EUR')
+.reduce((sum,w)=>sum+Number(w.current_balance),0);
+
+el('walletTotal').textContent=money(total);
+el('homeWalletTotal').textContent=money(total);
+
+el('walletList').replaceChildren();
+el('archivedWalletList').replaceChildren();
+
+for(const w of active){
+el('walletList').append(renderWallet(w));
+}
+
+for(const w of archived){
+el('archivedWalletList').append(renderWallet(w));
+}
+
+if(!active.length){
+el('walletList').textContent='Все още няма портфейли.';
+}
+
+if(!archived.length){
+el('archivedWalletList').textContent='Няма архивирани портфейли.';
+}
+
+fillWalletSelects();
+}
+
+function renderWallet(w){
+const card=document.createElement('div');
+card.className='card';
+
+const line=document.createElement('div');
+line.className='row';
+
+const icon=document.createElement('span');
+icon.className='wallet-icon';
+icon.textContent=walletIcons[w.type] || '👛';
+
+const info=document.createElement('div');
+info.style.flex='1';
+
+const title=document.createElement('strong');
+title.textContent=w.name;
+
+const type=document.createElement('p');
+type.className='muted';
+type.textContent=walletTypes[w.type] || 'Друг';
+
+info.append(title,type);
+
+const balance=document.createElement('div');
+balance.className='wallet-value';
+balance.textContent=money(w.current_balance);
+
+if(Number(w.current_balance)<0){
+balance.classList.add('red');
+}
+
+line.append(icon,info,balance);
+card.append(line);
+
+const opening=document.createElement('small');
+opening.textContent='Начално салдо: '+money(w.opening_balance);
+card.append(opening);
+
+if(Number(w.current_balance)<0){
+const warning=document.createElement('p');
+warning.className='red';
+warning.textContent='⚠ Отрицателна наличност';
+card.append(warning);
+}
+
+const actions=document.createElement('div');
+actions.className='actions';
+
+actions.append(makeButton(
+'Преименувай',
+()=>renameWallet(w)
+));
+
+actions.append(makeButton(
+w.archived?'Възстанови':'Архивирай',
+()=>archiveWallet(w)
+));
+
+card.append(actions);
+return card;
+}
+
+async function createWallet(){
+if(!user || busy)return;
+
+const name=el('walletName').value.trim();
+const opening=Number(el('openingBalance').value);
+
+if(!name || !Number.isFinite(opening)){
+return msg('Въведи име и валидно начално салдо.');
+}
+
+busy=true;
+try{
+const {error}=await db.from('wallets').insert({
+owner_id:user.id,
+name,
+type:el('walletType').value,
+currency:'EUR',
+opening_balance:opening
+});
+
+if(error)return fail(error);
+
+el('walletName').value='';
+el('openingBalance').value='0';
+el('walletForm').hidden=true;
+
+msg('Портфейлът е създаден.');
+await loadWallets();
+}finally{busy=false;}
+}
+
+async function renameWallet(w){
+if(!user || busy)return;
+
+const name=prompt('Ново име',w.name);
+
+if(name===null)return;
+if(!name.trim())return msg('Въведи име.');
+
+busy=true;
+try{
+const {error}=await db.from('wallets')
+.update({name:name.trim()})
+.eq('id',w.wallet_id)
+.eq('owner_id',user.id);
+
+if(error)return fail(error);
+
+msg('Името е променено.');
+await loadWallets();
+renderTransactions();
+}finally{busy=false;}
+}
+
+async function archiveWallet(w){
+if(!user || busy)return;
+
+if(!w.archived &&
+!confirm('Да архивирам ли портфейла? Операциите му ще се запазят.'))return;
+
+busy=true;
+try{
+const {error}=await db.from('wallets')
+.update({archived:!w.archived})
+.eq('id',w.wallet_id)
+.eq('owner_id',user.id);
+
+if(error)return fail(error);
+
+msg(w.archived?
+'Портфейлът е възстановен.':
+'Портфейлът е архивиран.');
+
+await loadWallets();
+}finally{busy=false;}
+}
+
 async function addTransaction(){
 if(!user || busy)return;
+
 const name=el('txName').value.trim();
 const amount=Number(el('amount').value);
+const type=el('type').value;
 const budget=el('budget').value;
+const wallet=el('txWallet').value || null;
+const destination=type==='transfer'?
+el('destinationWallet').value || null:null;
 
-if(!budget)return msg('Първо създай или избери бюджет.');
-if(!name || !Number.isFinite(amount) || amount<=0)
+if(!budget)return msg('Първо избери бюджет.');
+
+if(!name || !Number.isFinite(amount) || amount<=0){
 return msg('Въведи име и валидна сума.');
+}
+
+if(type==='transfer'){
+const selected=budgets.find(b=>b.id===budget);
+
+if(!selected || selected.type!=='personal' ||
+selected.owner_id!==user.id){
+return msg('За трансфер избери собствен личен бюджет.');
+}
+
+if(!wallet || !destination){
+return msg('Избери два портфейла.');
+}
+
+if(wallet===destination){
+return msg('Портфейлите трябва да са различни.');
+}
+}
+
+const source=wallets.find(w=>w.wallet_id===wallet);
+
+if(source && type!=='income' &&
+amount>Number(source.current_balance)){
+if(!confirm('Наличността може да стане отрицателна. Продължаваш ли?'))return;
+}
 
 busy=true;
 try{
 const {error}=await db.rpc('create_transaction',{
 p_name:name,
-p_type:el('type').value,
+p_type:type,
 p_amount:amount,
 p_budget_ids:[budget],
-p_category:el('category').value,
+p_wallet_id:wallet,
+p_destination_wallet_id:destination,
+p_category:type==='transfer'?null:el('category').value,
 p_date:el('txDate').value || today(),
 p_currency:'EUR'
 });
+
 if(error)return fail(error);
 
 el('txName').value='';
 el('amount').value='';
 closeForm();
-msg('Операцията е запазена.');
+
+msg(type==='transfer'?
+'Трансферът е записан.':
+'Операцията е запазена.');
+
+await loadWallets();
 await loadTransactions();
 }finally{busy=false;}
 }
@@ -746,6 +1137,7 @@ await loadTransactions();
 async function loadTransactions(){
 const request=++refreshId;
 const budget=el('budget').value;
+
 records=[];
 renderTransactions();
 
@@ -767,6 +1159,7 @@ if(error)return fail(error);
 if(!links || !links.length)break;
 
 const ids=links.map(x=>x.transaction_id);
+
 const {data,error:txError}=await db
 .from('transactions')
 .select('*')
@@ -776,6 +1169,7 @@ if(request!==refreshId || !user)return;
 if(txError)return fail(txError);
 
 collected.push(...(data || []));
+
 if(links.length<200)break;
 offset+=200;
 }
@@ -784,7 +1178,12 @@ records=collected.sort((a,b)=>
 b.transaction_date.localeCompare(a.transaction_date) ||
 b.created_at.localeCompare(a.created_at)
 );
+
 renderTransactions();
+}
+
+function walletName(id){
+return wallets.find(w=>w.wallet_id===id)?.name || '';
 }
 
 function renderItem(t,compact=false){
@@ -798,30 +1197,65 @@ const name=document.createElement('strong');
 name.textContent=t.name;
 
 const value=document.createElement('strong');
-value.className=t.type==='income'?'green':'red';
-value.textContent=(t.type==='income'?'+':'−')+money(t.amount);
+
+value.className=t.type==='income'?'green':
+t.type==='expense'?'red':'muted';
+
+value.textContent=(
+t.type==='income'?'+':
+t.type==='expense'?'−':'⇄ '
+)+money(t.amount);
 
 line.append(name,value);
 row.append(line);
 
 const detail=document.createElement('p');
 detail.className='muted';
-detail.textContent=t.transaction_date+' • '+(t.category || 'Други');
+
+let description=t.transaction_date+' • '+
+(t.type==='transfer'?'Трансфер':t.category || 'Други');
+
+const source=walletName(t.wallet_id);
+const destination=walletName(t.destination_wallet_id);
+
+if(source)description+=' • '+source;
+if(destination)description+=' → '+destination;
+
+detail.textContent=description;
 row.append(detail);
 
 if(compact)return row;
+
+const budget=budgets.find(b=>b.id===el('budget').value);
+
+const mayManage=t.created_by===user?.id ||
+budget?.owner_id===user?.id;
+
+if(!mayManage)return row;
 
 const actions=document.createElement('div');
 actions.className='actions';
 
 if(t.deleted_at){
-actions.append(makeButton('Възстанови',()=>restore(t.id)));
+const age=Date.now()-new Date(t.deleted_at).getTime();
+
+if(age<=30*24*60*60*1000){
+actions.append(makeButton(
+'Възстанови',
+()=>restore(t.id)
+));
+}else{
+const expired=document.createElement('small');
+expired.textContent='Срокът за възстановяване е изтекъл.';
+actions.append(expired);
+}
 }else{
 actions.append(
 makeButton('Редактирай',()=>edit(t)),
 makeButton('Изтрий',()=>remove(t.id),'danger')
 );
 }
+
 row.append(actions);
 return row;
 }
@@ -830,11 +1264,13 @@ function renderTransactions(){
 const active=records.filter(t=>!t.deleted_at);
 let income=0;
 let expense=0;
-const totals={};
+const totals=Object.create(null);
 
 for(const t of active){
 const amount=Number(t.amount);
+
 if(t.type==='income')income+=amount;
+
 if(t.type==='expense'){
 expense+=amount;
 const category=t.category || 'Други';
@@ -859,7 +1295,10 @@ const filter=el('filter').value;
 
 for(const t of active){
 if(filter!=='all' && t.type!==filter)continue;
-if(!((t.name+' '+(t.category || '')).toLowerCase().includes(search)))continue;
+
+if(!((t.name+' '+(t.category || ''))
+.toLowerCase().includes(search)))continue;
+
 el('transactions').append(renderItem(t));
 }
 
@@ -867,14 +1306,17 @@ for(const t of records.filter(t=>t.deleted_at)){
 el('trash').append(renderItem(t));
 }
 
-if(!el('recent').children.length)
+if(!el('recent').children.length){
 el('recent').textContent='Няма операции.';
+}
 
-if(!el('transactions').children.length)
+if(!el('transactions').children.length){
 el('transactions').textContent='Няма операции.';
+}
 
-if(!el('trash').children.length)
+if(!el('trash').children.length){
 el('trash').textContent='Кошчето е празно.';
+}
 
 drawDonut('homeChart',totals,expense);
 drawDonut('statsChart',totals,expense);
@@ -904,7 +1346,11 @@ const parts=[];
 
 entries.forEach(([name,value],i)=>{
 const end=start+value/total*100;
-parts.push(colors[i%colors.length]+' '+start+'% '+end+'%');
+
+parts.push(
+colors[i%colors.length]+' '+start+'% '+end+'%'
+);
+
 start=end;
 });
 
@@ -917,6 +1363,7 @@ center.className='donut-center';
 
 const label=document.createElement('small');
 label.textContent='Разходи';
+
 const sum=document.createElement('strong');
 sum.textContent=money(total);
 
@@ -937,7 +1384,8 @@ title.textContent=name;
 title.style.flex='1';
 
 const amount=document.createElement('strong');
-amount.textContent=money(value)+' · '+Math.round(value/total*100)+'%';
+amount.textContent=money(value)+' · '+
+Math.round(value/total*100)+'%';
 
 line.append(dot,title,amount);
 container.append(line);
@@ -947,6 +1395,7 @@ container.append(line);
 function drawBars(income,expense){
 const container=el('barChart');
 container.replaceChildren();
+
 const max=Math.max(income,expense,1);
 
 for(const [name,value,color] of [
@@ -978,13 +1427,28 @@ container.append(title,bar);
 
 async function edit(t){
 if(busy)return;
+
 const name=prompt('Наименование',t.name);
 if(name===null)return;
+
 const amount=prompt('Сума',t.amount);
 if(amount===null)return;
 
-if(!name.trim() || !Number.isFinite(Number(amount)) || Number(amount)<=0)
+if(!name.trim() ||
+!Number.isFinite(Number(amount)) ||
+Number(amount)<=0){
 return msg('Невалидни данни.');
+}
+
+const source=wallets.find(w=>w.wallet_id===t.wallet_id);
+
+if(source && t.type!=='income'){
+const projected=Number(source.current_balance)+
+Number(t.amount)-Number(amount);
+
+if(projected<0 &&
+!confirm('Наличността може да стане отрицателна. Продължаваш ли?'))return;
+}
 
 busy=true;
 try{
@@ -997,41 +1461,60 @@ p_category:t.category,
 p_subcategory:t.subcategory,
 p_notes:t.notes
 });
+
 if(error)return fail(error);
+
 msg('Операцията е редактирана.');
+await loadWallets();
 await loadTransactions();
 }finally{busy=false;}
 }
 
 async function remove(id){
 if(busy || !confirm('Да изтрия ли операцията?'))return;
+
 busy=true;
 try{
-const {error}=await db.rpc('delete_transaction',{p_id:id});
+const {error}=await db.rpc('delete_transaction',{
+p_id:id
+});
+
 if(error)return fail(error);
+
 msg('Операцията е преместена в кошчето.');
+await loadWallets();
 await loadTransactions();
 }finally{busy=false;}
 }
 
 async function restore(id){
 if(busy)return;
+
 busy=true;
 try{
-const {error}=await db.rpc('restore_transaction',{p_id:id});
+const {error}=await db.rpc('restore_transaction',{
+p_id:id
+});
+
 if(error)return fail(error);
+
 msg('Операцията е възстановена.');
+await loadWallets();
 await loadTransactions();
 }finally{busy=false;}
 }
 
 async function invite(){
 if(!user || busy)return;
+
 const budget=budgets.find(b=>b.id===el('budget').value);
-if(!budget || budget.type!=='family')
+
+if(!budget || budget.type!=='family'){
 return msg('Избери семеен бюджет.');
+}
 
 const email=el('inviteEmail').value.trim();
+
 if(!email)return msg('Въведи имейл.');
 
 busy=true;
@@ -1040,7 +1523,9 @@ const {error}=await db.rpc('create_budget_invitation',{
 p_budget_id:budget.id,
 p_email:email
 });
+
 if(error)return fail(error);
+
 el('inviteEmail').value='';
 msg('Поканата е създадена в приложението.');
 }finally{busy=false;}
@@ -1048,6 +1533,7 @@ msg('Поканата е създадена в приложението.');
 
 async function loadInvitations(){
 if(!user)return;
+
 const sid=sessionId;
 const email=user.email;
 
@@ -1072,31 +1558,46 @@ row.className='item';
 const title=document.createElement('p');
 title.textContent='Покана за семеен бюджет';
 
-row.append(title,makeButton('Приеми',()=>accept(i.id),'full'));
+row.append(
+title,
+makeButton('Приеми',()=>accept(i.id),'full')
+);
+
 el('invitations').append(row);
 }
 
-if(!received.length)
+if(!received.length){
 el('invitations').textContent='Няма нови покани.';
+}
 }
 
 async function accept(id){
 if(busy)return;
+
 busy=true;
 try{
 const {error}=await db.rpc('accept_budget_invitation',{
 p_invitation_id:id
 });
+
 if(error)return fail(error);
+
 msg('Поканата е приета.');
 await refresh();
 }finally{busy=false;}
 }
 
 db.auth.onAuthStateChange((event,session)=>{
-if(['INITIAL_SESSION','SIGNED_IN','SIGNED_OUT','USER_UPDATED'].includes(event)){
+if([
+'INITIAL_SESSION',
+'SIGNED_IN',
+'SIGNED_OUT',
+'USER_UPDATED'
+].includes(event)){
 setTimeout(()=>{
-if(event==='SIGNED_IN' && user?.id===session?.user?.id)return;
+if(event==='SIGNED_IN' &&
+user?.id===session?.user?.id)return;
+
 showSession(session);
 },0);
 }
@@ -1106,7 +1607,7 @@ document.addEventListener('visibilitychange',()=>{
 if(!document.hidden && user && !busy)refresh();
 });
 
-loadCategories();
+updateForm();
 el('txDate').value=today();
 </script>
 </body>
