@@ -1610,5 +1610,972 @@ if(!document.hidden && user && !busy)refresh();
 updateForm();
 el('txDate').value=today();
 </script>
+  
+<script>
+let customCategories = [];
+let categorySession = 0;
+
+const categoryIcons = [
+'📁','🍔','🏠','🚗','⛽','🛒',
+'👶','💊','💰','🎁','✈️','👕',
+'📱','🎮','🏋️','💳','🔧','📚'
+];
+
+const categoryColors = [
+'#3b82f6','#22c55e','#ef4444',
+'#f59e0b','#a855f7','#06b6d4',
+'#ec4899','#64748b'
+];
+
+const categoryPage = document.createElement('section');
+categoryPage.id = 'page-categories';
+categoryPage.className = 'page';
+categoryPage.hidden = true;
+
+categoryPage.innerHTML = `
+<button class="secondary"
+onclick="showPage('more')">‹ Назад</button>
+
+<h2>Моите категории</h2>
+
+<select id="manageCategoryType"
+onchange="renderCustomCategories()">
+<option value="expense">Разходи</option>
+<option value="income">Приходи</option>
+</select>
+
+<button class="full"
+onclick="newCustomCategory()">
++ Нова категория
+</button>
+
+<div id="customCategoryForm" class="card" hidden>
+
+<h3>Добави категория</h3>
+
+<input id="customCategoryName"
+placeholder="Наименование">
+
+<select id="customCategoryParent">
+<option value="">Основна категория</option>
+</select>
+
+<small>Иконка</small>
+<select id="customCategoryIcon"></select>
+
+<small>Цвят</small>
+<select id="customCategoryColor"></select>
+
+<button class="full"
+onclick="saveCustomCategory()">
+Запази
+</button>
+
+<button class="full secondary"
+onclick="el('customCategoryForm').hidden=true">
+Отказ
+</button>
+
+</div>
+
+<div id="customCategoryList"></div>
+
+<button class="full secondary"
+onclick="toggleArchivedCategories()">
+Покажи / скрий архивираните
+</button>
+
+<div id="archivedCategoryList" hidden></div>
+`;
+
+el('app').append(categoryPage);
+
+const categoryMenu = document.createElement('button');
+categoryMenu.className = 'menu';
+categoryMenu.textContent = 'Категории ›';
+
+categoryMenu.onclick = ()=>{
+showPage('categories');
+fetchCustomCategories();
+};
+
+const moreMenu = el('page-more')
+.querySelectorAll('.card')[1];
+
+moreMenu.prepend(categoryMenu);
+
+const subcategoryField = document.createElement('div');
+
+subcategoryField.id = 'subcategoryField';
+
+subcategoryField.innerHTML = `
+<small>Подкатегория</small>
+
+<select id="txSubcategory">
+<option value="">Без подкатегория</option>
+</select>
+
+<button type="button"
+class="full secondary"
+onclick="quickAddCategory(true)">
++ Нова подкатегория
+</button>
+`;
+
+el('categoryField').append(subcategoryField);
+
+const quickCategoryButton = document.createElement('button');
+
+quickCategoryButton.className = 'full secondary';
+quickCategoryButton.type = 'button';
+quickCategoryButton.textContent = '+ Нова категория';
+
+quickCategoryButton.onclick = ()=>{
+quickAddCategory(false);
+};
+
+el('category').after(quickCategoryButton);
+
+for(const icon of categoryIcons){
+const option = document.createElement('option');
+option.value = icon;
+option.textContent = icon;
+el('customCategoryIcon').append(option);
+}
+
+const colorNames = [
+'Син','Зелен','Червен','Оранжев',
+'Лилав','Тюркоазен','Розов','Сив'
+];
+
+categoryColors.forEach((color,i)=>{
+const option = document.createElement('option');
+option.value = color;
+option.textContent = colorNames[i];
+el('customCategoryColor').append(option);
+});
+
+async function fetchCustomCategories(){
+
+const request = ++categorySession;
+const currentUser = user?.id;
+
+if(!currentUser){
+customCategories = [];
+return;
+}
+
+const collected = [];
+let offset = 0;
+
+while(true){
+
+const {data,error} = await db
+.from('categories')
+.select('*')
+.eq('owner_id',currentUser)
+.order('id')
+.range(offset,offset+199);
+
+if(request !== categorySession ||
+user?.id !== currentUser)return;
+
+if(error)return fail(error);
+
+collected.push(...(data || []));
+
+if(!data || data.length < 200)break;
+
+offset += 200;
+}
+
+customCategories = collected;
+
+renderCustomCategories();
+loadCategories();
+}
+
+function activeCategories(type){
+
+return customCategories.filter(c=>
+c.type === type && !c.archived
+);
+}
+
+function addCategoryOption(select,value,label){
+
+const option = document.createElement('option');
+
+option.value = value;
+option.textContent = label;
+
+select.append(option);
+}
+
+loadCategories = function(){
+
+const type = el('type').value;
+const select = el('category');
+const old = select.value;
+
+select.replaceChildren();
+
+const active = activeCategories(type);
+
+const roots = active
+.filter(c=>!c.parent_id)
+.sort((a,b)=>
+Number(b.is_favorite)-Number(a.is_favorite) ||
+a.name.localeCompare(b.name,'bg')
+);
+
+const names = new Set();
+
+for(const c of roots){
+
+addCategoryOption(
+select,
+c.name,
+(c.is_favorite?'⭐ ':'')+
+(c.icon || '📁')+' '+c.name
+);
+
+names.add(c.name);
+}
+
+for(const name of categories[type] || []){
+
+if(names.has(name))continue;
+
+const archived = customCategories.some(c=>
+c.type===type &&
+!c.parent_id &&
+c.name===name &&
+c.archived
+);
+
+if(!archived){
+addCategoryOption(select,name,name);
+}
+}
+
+if([...select.options].some(o=>o.value===old)){
+select.value=old;
+}
+
+loadSubcategories();
+};
+
+function loadSubcategories(){
+
+const select = el('txSubcategory');
+const old = select.value;
+
+select.replaceChildren();
+
+addCategoryOption(
+select,'','Без подкатегория'
+);
+
+const type = el('type').value;
+
+const parent = activeCategories(type)
+.find(c=>
+!c.parent_id &&
+c.name===el('category').value
+);
+
+if(parent){
+
+const children = activeCategories(type)
+.filter(c=>c.parent_id===parent.id)
+.sort((a,b)=>
+Number(b.is_favorite)-Number(a.is_favorite) ||
+a.name.localeCompare(b.name,'bg')
+);
+
+for(const c of children){
+
+addCategoryOption(
+select,
+c.name,
+(c.is_favorite?'⭐ ':'')+
+(c.icon || '📁')+' '+c.name
+);
+}
+}
+
+if([...select.options].some(o=>o.value===old)){
+select.value=old;
+}
+}
+
+el('category').addEventListener(
+'change',loadSubcategories
+);
+
+function newCustomCategory(){
+
+el('customCategoryForm').hidden=false;
+el('customCategoryName').value='';
+
+const select = el('customCategoryParent');
+
+select.replaceChildren();
+
+addCategoryOption(
+select,'','Основна категория'
+);
+
+const type = el('manageCategoryType').value;
+
+const names = new Set();
+
+for(const c of activeCategories(type)){
+
+if(c.parent_id)continue;
+
+addCategoryOption(
+select,c.name,c.name
+);
+
+names.add(c.name);
+}
+
+for(const name of categories[type] || []){
+
+if(names.has(name))continue;
+
+const archived = customCategories.some(c=>
+c.type===type &&
+!c.parent_id &&
+c.name===name &&
+c.archived
+);
+
+if(!archived){
+addCategoryOption(select,name,name);
+}
+}
+}
+
+el('manageCategoryType').addEventListener(
+'change',()=>{
+el('customCategoryForm').hidden=true;
+}
+);
+
+async function insertCustomCategory(
+name,type,parentId=null,
+icon='📁',color='#3b82f6'
+){
+
+if(!user)throw new Error('Не си влязъл в профила.');
+
+name=name.trim();
+
+if(!name)throw new Error('Въведи име.');
+
+const duplicate = customCategories.find(c=>
+c.type===type &&
+c.parent_id===parentId &&
+c.name.toLowerCase()===name.toLowerCase()
+);
+
+if(duplicate){
+
+if(duplicate.archived){
+throw new Error(
+'Категорията е архивирана. Възстанови я.'
+);
+}
+
+throw new Error('Категорията вече съществува.');
+}
+
+const {data,error}=await db
+.from('categories')
+.insert({
+owner_id:user.id,
+name,
+type,
+parent_id:parentId,
+icon,
+color,
+is_favorite:false,
+archived:false
+})
+.select()
+.single();
+
+if(error)throw error;
+
+customCategories.push(data);
+
+return data;
+}
+
+async function ensureParent(name,type){
+
+const existing = customCategories.find(c=>
+c.type===type &&
+!c.parent_id &&
+c.name===name
+);
+
+if(existing){
+
+if(existing.archived){
+throw new Error('Категорията е архивирана.');
+}
+
+return existing.id;
+}
+
+const parent = await insertCustomCategory(
+name,type
+);
+
+return parent.id;
+}
+
+async function saveCustomCategory(){
+
+if(!user || busy)return;
+
+const name=el('customCategoryName').value.trim();
+
+if(!name)return msg('Въведи име.');
+
+busy=true;
+
+try{
+
+const type=el('manageCategoryType').value;
+
+const parentName=el('customCategoryParent').value;
+
+const parentId=parentName?
+await ensureParent(parentName,type):null;
+
+await insertCustomCategory(
+name,
+type,
+parentId,
+el('customCategoryIcon').value,
+el('customCategoryColor').value
+);
+
+el('customCategoryForm').hidden=true;
+
+await fetchCustomCategories();
+
+msg('Категорията е добавена.');
+
+}catch(error){
+fail(error);
+}finally{
+busy=false;
+}
+}
+
+async function quickAddCategory(isChild){
+
+if(!user || busy)return;
+
+const type=el('type').value;
+
+if(type==='transfer')return;
+
+const parentName=el('category').value;
+
+if(isChild && !parentName){
+return msg('Първо избери категория.');
+}
+
+const name=prompt(
+isChild?
+'Име на новата подкатегория':
+'Име на новата категория'
+);
+
+if(name===null || !name.trim())return;
+
+busy=true;
+
+try{
+
+const parentId=isChild?
+await ensureParent(parentName,type):null;
+
+await insertCustomCategory(
+name.trim(),type,parentId
+);
+
+await fetchCustomCategories();
+
+el('category').value=isChild?
+parentName:name.trim();
+
+loadSubcategories();
+
+if(isChild){
+el('txSubcategory').value=name.trim();
+}
+
+msg('Категорията е добавена.');
+
+}catch(error){
+fail(error);
+}finally{
+busy=false;
+}
+}
+
+function renderCustomCategories(){
+
+const type=el('manageCategoryType').value;
+
+const list=el('customCategoryList');
+const archived=el('archivedCategoryList');
+
+list.replaceChildren();
+archived.replaceChildren();
+
+const active=activeCategories(type);
+
+const roots=active
+.filter(c=>!c.parent_id)
+.sort((a,b)=>
+Number(b.is_favorite)-Number(a.is_favorite) ||
+a.name.localeCompare(b.name,'bg')
+);
+
+for(const c of roots){
+
+const card=document.createElement('div');
+card.className='card';
+
+card.append(renderCategoryRow(c));
+
+for(const child of active.filter(
+x=>x.parent_id===c.id
+)){
+
+const nested=renderCategoryRow(child);
+
+nested.style.marginLeft='18px';
+
+card.append(nested);
+}
+
+card.append(makeButton(
+'+ Подкатегория',
+()=>addChildCategory(c),
+'full secondary'
+));
+
+list.append(card);
+}
+
+const standard=document.createElement('div');
+standard.className='card';
+
+const title=document.createElement('h3');
+title.textContent='Стандартни категории';
+
+standard.append(title);
+
+for(const name of categories[type] || []){
+
+if(customCategories.some(c=>
+c.type===type &&
+!c.parent_id &&
+c.name===name
+))continue;
+
+const row=document.createElement('div');
+row.className='row item';
+
+const label=document.createElement('span');
+label.textContent=name;
+
+row.append(
+label,
+makeButton(
+'Персонализирай',
+()=>customizeStandard(name,type)
+)
+);
+
+standard.append(row);
+}
+
+list.append(standard);
+
+for(const c of customCategories.filter(
+x=>x.type===type && x.archived
+)){
+
+const card=document.createElement('div');
+card.className='card';
+
+card.append(renderCategoryRow(c));
+
+archived.append(card);
+}
+
+if(!archived.children.length){
+archived.textContent='Няма архивирани категории.';
+}
+}
+
+function renderCategoryRow(c){
+
+const row=document.createElement('div');
+row.className='item';
+
+const line=document.createElement('div');
+line.className='row';
+
+const title=document.createElement('strong');
+
+title.textContent=
+(c.icon || '📁')+' '+c.name;
+
+if(categoryColors.includes(c.color)){
+title.style.color=c.color;
+}
+
+const star=makeButton(
+c.is_favorite?'★':'☆',
+()=>changeCategory(c,{
+is_favorite:!c.is_favorite
+})
+);
+
+line.append(title,star);
+row.append(line);
+
+const actions=document.createElement('div');
+actions.className='actions';
+
+actions.append(makeButton(
+'Редактирай',
+()=>editCustomCategory(c)
+));
+
+actions.append(makeButton(
+c.archived?'Възстанови':'Архивирай',
+()=>archiveCustomCategory(c)
+));
+
+row.append(actions);
+
+return row;
+}
+
+async function changeCategory(c,values){
+
+if(!user || busy)return;
+
+busy=true;
+
+try{
+
+const {error}=await db
+.from('categories')
+.update(values)
+.eq('id',c.id)
+.eq('owner_id',user.id);
+
+if(error)throw error;
+
+await fetchCustomCategories();
+
+msg('Промяната е запазена.');
+
+}catch(error){
+fail(error);
+}finally{
+busy=false;
+}
+}
+
+async function editCustomCategory(c){
+
+const name=prompt('Наименование',c.name);
+
+if(name===null || !name.trim())return;
+
+const icon=prompt(
+'Иконка (емоджи)',
+c.icon || '📁'
+);
+
+if(icon===null)return;
+
+const color=prompt(
+'Цвят (HEX код)',
+c.color || '#3b82f6'
+);
+
+if(color===null)return;
+
+if(!/^#[0-9a-fA-F]{6}$/.test(color)){
+return msg('Невалиден цвят.');
+}
+
+await changeCategory(c,{
+name:name.trim(),
+icon:icon.trim() || '📁',
+color
+});
+}
+
+async function archiveCustomCategory(c){
+
+if(!c.archived &&
+!confirm('Да архивирам ли категорията?'))return;
+
+if(c.archived && c.parent_id){
+
+const parent=customCategories.find(
+x=>x.id===c.parent_id
+);
+
+if(parent?.archived){
+return msg('Първо възстанови основната категория.');
+}
+}
+
+await changeCategory(c,{
+archived:!c.archived
+});
+}
+
+async function addChildCategory(c){
+
+if(!user || busy)return;
+
+const name=prompt('Име на подкатегорията');
+
+if(name===null || !name.trim())return;
+
+busy=true;
+
+try{
+
+await insertCustomCategory(
+name.trim(),c.type,c.id
+);
+
+await fetchCustomCategories();
+
+msg('Подкатегорията е добавена.');
+
+}catch(error){
+fail(error);
+}finally{
+busy=false;
+}
+}
+
+async function customizeStandard(name,type){
+
+if(!user || busy)return;
+
+busy=true;
+
+try{
+
+await ensureParent(name,type);
+
+await fetchCustomCategories();
+
+msg('Категорията вече може да се персонализира.');
+
+}catch(error){
+fail(error);
+}finally{
+busy=false;
+}
+}
+
+function toggleArchivedCategories(){
+
+const section=el('archivedCategoryList');
+
+section.hidden=!section.hidden;
+}
+
+const previousShowSession=showSession;
+
+showSession=async function(session){
+
+categorySession++;
+customCategories=[];
+
+await previousShowSession(session);
+
+if(user)await fetchCustomCategories();
+};
+
+const previousRefresh=refresh;
+
+refresh=async function(){
+
+await previousRefresh();
+
+if(user)await fetchCustomCategories();
+};
+
+const previousShowPage=showPage;
+
+showPage=function(page){
+
+previousShowPage(page);
+
+if(page==='categories'){
+
+document.querySelectorAll('.nav button')
+.forEach(b=>{
+b.classList.toggle(
+'active',b.dataset.page==='more'
+);
+});
+
+fetchCustomCategories();
+}
+};
+
+const previousOpenForm=openForm;
+
+openForm=function(type){
+
+previousOpenForm(type);
+
+el('txSubcategory').value='';
+
+if(user)fetchCustomCategories();
+};
+
+addTransaction=async function(){
+
+if(!user || busy)return;
+
+const name=el('txName').value.trim();
+const amount=Number(el('amount').value);
+const type=el('type').value;
+const budget=el('budget').value;
+const wallet=el('txWallet').value || null;
+
+const destination=type==='transfer'?
+el('destinationWallet').value || null:null;
+
+if(!budget)return msg('Първо избери бюджет.');
+
+if(!name ||
+!Number.isFinite(amount) ||
+amount<=0){
+return msg('Въведи име и валидна сума.');
+}
+
+if(type==='transfer'){
+
+const selected=budgets.find(b=>b.id===budget);
+
+if(!selected ||
+selected.type!=='personal' ||
+selected.owner_id!==user.id){
+return msg('Избери собствен личен бюджет.');
+}
+
+if(!wallet || !destination ||
+wallet===destination){
+return msg('Избери два различни портфейла.');
+}
+}
+
+const source=wallets.find(
+w=>w.wallet_id===wallet
+);
+
+if(source && type!=='income' &&
+amount>Number(source.current_balance)){
+
+if(!confirm(
+'Наличността може да стане отрицателна. Продължаваш ли?'
+))return;
+}
+
+busy=true;
+
+try{
+
+const {error}=await db.rpc(
+'create_transaction',{
+p_name:name,
+p_type:type,
+p_amount:amount,
+p_budget_ids:[budget],
+p_wallet_id:wallet,
+p_destination_wallet_id:destination,
+p_category:type==='transfer'?
+null:el('category').value,
+p_subcategory:type==='transfer'?
+null:el('txSubcategory').value || null,
+p_date:el('txDate').value || today(),
+p_currency:'EUR'
+});
+
+if(error)throw error;
+
+el('txName').value='';
+el('amount').value='';
+el('txSubcategory').value='';
+
+closeForm();
+
+msg('Операцията е запазена.');
+
+await loadWallets();
+await loadTransactions();
+
+}catch(error){
+fail(error);
+}finally{
+busy=false;
+}
+};
+
+const previousRenderItem=renderItem;
+
+renderItem=function(t,compact=false){
+
+const row=previousRenderItem(t,compact);
+
+if(t.subcategory){
+
+const detail=row.querySelector('p');
+
+if(detail){
+detail.textContent+=' • '+t.subcategory;
+}
+}
+
+if(t.created_by!==user?.id &&
+(t.wallet_id || t.destination_wallet_id)){
+
+row.querySelector('.actions')?.remove();
+}
+
+return row;
+};
+
+if(user)fetchCustomCategories();
+
+</script>
+
 </body>
 </html>
