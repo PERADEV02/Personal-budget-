@@ -360,6 +360,15 @@ box-shadow:0 4px 20px #0004;
 <p class="muted">Трансферът не се отчита като приход или разход.</p>
 </div>
 
+<div id="txBudgetField">
+<small>Запиши в бюджет</small>
+<select id="txBudget" onchange="fillSecondBudget()"></select>
+<div id="secondBudgetField">
+<small>Допълнителен бюджет (незадължително)</small>
+<select id="txSecondBudget"></select>
+<p class="muted" id="sharedBudgetNotice" hidden>Операцията ще бъде видима в двата бюджета, включително за членовете на семейния бюджет. Сумата се записва само веднъж.</p>
+</div>
+</div>
 <input id="txDate" type="date">
 <button class="full" onclick="addTransaction()">Запази</button>
 </div>
@@ -2467,7 +2476,11 @@ if(!user || busy)return;
 const name=el('txName').value.trim();
 const amount=Number(el('amount').value);
 const type=el('type').value;
-const budget=el('budget').value;
+const budget=el('txBudget').value;
+const second=type==='transfer'?'':el('txSecondBudget').value;
+const selectedBudget=budgets.find(x=>x.id===budget);
+if(!selectedBudget || !eligibleTxBudgets().some(x=>x.id===budget))return msg('Избери валиден бюджет.');
+if(second && !eligibleSecondBudgets().some(x=>x.id===second))return msg('Избери валиден допълнителен бюджет.');
 const wallet=el('txWallet').value || null;
 
 const destination=type==='transfer'?
@@ -2518,7 +2531,7 @@ const {error}=await db.rpc(
 p_name:name,
 p_type:type,
 p_amount:amount,
-p_budget_ids:[budget],
+p_budget_ids:second?[budget,second]:[budget],
 p_wallet_id:wallet,
 p_destination_wallet_id:destination,
 p_category:type==='transfer'?
@@ -2575,6 +2588,44 @@ return row;
 
 if(user)fetchCustomCategories();
 
+</script>
+
+
+<script>
+function eligibleTxBudgets(){
+ return budgets.filter(b=>b.currency==='EUR' && (el('type').value!=='transfer' || (b.type==='personal' && b.owner_id===user?.id)));
+}
+function eligibleSecondBudgets(){
+ const first=budgets.find(b=>b.id===el('txBudget').value);
+ if(!first || el('type').value==='transfer')return [];
+ if(first.type==='personal' && first.owner_id===user?.id)return budgets.filter(b=>b.type==='family' && b.currency===first.currency);
+ if(first.type==='family')return budgets.filter(b=>b.type==='personal' && b.owner_id===user?.id && b.currency===first.currency);
+ return [];
+}
+function fillSecondBudget(reset=false){
+ const select=el('txSecondBudget'), old=reset?'':select.value;
+ const choices=eligibleSecondBudgets();
+ select.replaceChildren(new Option('Само избрания бюджет',''));
+ for(const b of choices)select.add(new Option(b.name,b.id));
+ if(choices.some(b=>b.id===old))select.value=old;
+ el('secondBudgetField').hidden=!choices.length;
+ el('sharedBudgetNotice').hidden=!select.value;
+}
+function fillTxBudgets(reset=false){
+ const select=el('txBudget'), old=reset?el('budget').value:select.value;
+ const choices=eligibleTxBudgets();
+ select.replaceChildren(new Option('Избери бюджет',''));
+ for(const b of choices)select.add(new Option(b.name,b.id));
+ if(choices.some(b=>b.id===old))select.value=old;
+ fillSecondBudget(reset);
+}
+el('txSecondBudget').addEventListener('change',()=>{el('sharedBudgetNotice').hidden=!el('txSecondBudget').value;});
+const multiOpenForm=openForm;
+openForm=function(type){multiOpenForm(type);fillTxBudgets(true);};
+const multiUpdateForm=updateForm;
+updateForm=function(){multiUpdateForm();fillTxBudgets(true);};
+const multiRefresh=refresh;
+refresh=async function(){await multiRefresh();if(user && !el('transactionForm').hidden)fillTxBudgets();};
 </script>
 
 </body>
